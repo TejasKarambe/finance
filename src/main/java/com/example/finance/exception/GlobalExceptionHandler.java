@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
 
-@RestControllerAdvice
+@RestControllerAdvice  //centralized exception handler for all controllers in the application
 public class GlobalExceptionHandler {
 
         @ExceptionHandler(UserNotFoundException.class)
@@ -16,11 +16,11 @@ public class GlobalExceptionHandler {
                         UserNotFoundException ex) {
 
                 ErrorResponse error = new ErrorResponse(
-                                404,
+                                404,            // Not Found
                                 ex.getMessage(),
                                 LocalDateTime.now());
 
-                return ResponseEntity
+                return ResponseEntity  //HTTP response that contains the error information
                                 .status(HttpStatus.NOT_FOUND)
                                 .body(error);
         }

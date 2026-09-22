@@ -5,11 +5,11 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users")     //creates table in the database if not exists
 public class User {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id        // identifies the primary key of the table
+    @GeneratedValue(strategy = GenerationType.IDENTITY)  // auto increments the id
     private Long id;
 
     @Column(nullable = false)
@@ -19,7 +19,7 @@ public class User {
     private String email;
 
     @Column(nullable = false)
-    private LocalDateTime createdAt;
+    private LocalDateTime createdAt; 
 
     public User() {
     }
