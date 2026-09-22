@@ -11,19 +11,18 @@ import java.time.LocalDateTime;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleUserNotFound(
-            UserNotFoundException ex) {
+        @ExceptionHandler(UserNotFoundException.class)
+        public ResponseEntity<ErrorResponse> handleUserNotFound(
+                        UserNotFoundException ex) {
 
-        ErrorResponse error = new ErrorResponse(
-                404,
-                ex.getMessage(),
-                LocalDateTime.now()
-        );
+                ErrorResponse error = new ErrorResponse(
+                                404,
+                                ex.getMessage(),
+                                LocalDateTime.now());
 
-        return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(error);
-    }
+                return ResponseEntity
+                                .status(HttpStatus.NOT_FOUND)
+                                .body(error);
+        }
 
 }

@@ -1,5 +1,7 @@
 package com.example.finance.service;
 
+import com.example.finance.dto.request.UserRequest;
+import com.example.finance.dto.response.UserResponse;
 import com.example.finance.entity.User;
 import com.example.finance.exception.UserNotFoundException;
 import com.example.finance.repository.UserRepository;
@@ -17,15 +19,32 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public User createUser(String name, String email) {
+//    public User createUser(String name, String email) {
+//
+//        User user = new User(
+//                name,
+//                email,
+//                LocalDateTime.now()
+//        );
+//
+//        return userRepository.save(user);
+//    }
+    public UserResponse createUser(UserRequest request) {
 
         User user = new User(
-                name,
-                email,
+                request.name(),
+                request.email(),
                 LocalDateTime.now()
         );
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        return new UserResponse(
+                savedUser.getId(),
+                savedUser.getName(),
+                savedUser.getEmail(),
+                savedUser.getCreatedAt()
+        );
     }
 
     public List<User> getUsers() {
