@@ -4,6 +4,7 @@ package com.example.finance.service;
 import com.example.finance.dto.request.UserRequest;
 import com.example.finance.dto.response.UserResponse;
 import com.example.finance.entity.User;
+import com.example.finance.exception.UserAlreadyExistsException;
 import com.example.finance.exception.UserNotFoundException;
 import com.example.finance.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -22,11 +23,19 @@ public class UserService {
 
     public UserResponse createUser(UserRequest request) {
 
+        // checks if a user with the same email already exists in the database
+        if (userRepository.existsByEmail(request.email())) {
+            throw new UserAlreadyExistsException(
+                    "User with this email already exists");
+        }
+
+        // If no user with the same email is found, a new User entity is created
         User user = new User(
                 request.name(),
                 request.email(),
                 LocalDateTime.now());
 
+        // The new user is saved to the database using userRepository.save()
         User savedUser = userRepository.save(user);
 
         return mapToResponse(savedUser);

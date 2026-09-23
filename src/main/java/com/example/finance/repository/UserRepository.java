@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface UserRepository extends JpaRepository<User, Long> {
     // User - The entity class for which the repository is created
     // Long - The data type of the primary key of the entity class
+
+    boolean existsByEmail(String email);
 }
 
 //eg. UserRepository userRepository = 

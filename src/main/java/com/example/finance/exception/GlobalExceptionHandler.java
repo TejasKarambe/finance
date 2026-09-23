@@ -52,4 +52,19 @@ public class GlobalExceptionHandler {
                                 .status(HttpStatus.BAD_REQUEST)
                                 .body(response);
         }
+
+        @ExceptionHandler(UserAlreadyExistsException.class)
+        public ResponseEntity<ErrorResponse> handleUserAlreadyExists(
+                        UserAlreadyExistsException ex) {
+
+                ErrorResponse error = new ErrorResponse(
+                                409,
+                                ex.getMessage(), // the error message passed from the service layer
+                                LocalDateTime.now());
+
+                return ResponseEntity
+                                .status(HttpStatus.CONFLICT) // 409 - CONFLICT
+                                .body(error);
+
+        }
 }
