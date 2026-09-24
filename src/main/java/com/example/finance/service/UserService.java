@@ -2,6 +2,7 @@
 package com.example.finance.service;
 
 import com.example.finance.dto.request.UserRequest;
+import com.example.finance.dto.request.UserUpdateRequest;
 import com.example.finance.dto.response.UserResponse;
 import com.example.finance.entity.User;
 import com.example.finance.exception.UserAlreadyExistsException;
@@ -65,5 +66,39 @@ public class UserService {
                 user.getName(),
                 user.getEmail(),
                 user.getCreatedAt());
+    }
+
+    public UserResponse updateUser(Long id, UserUpdateRequest request) {
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("User Not Found"));
+
+        // checks if user with the same email already exists in the database while
+        // updating.
+        // if yes, it will throw an exception.
+        if (!user.getEmail().equals(request.email())
+                && userRepository.existsByEmail(request.email())) {
+
+            throw new UserAlreadyExistsException(
+                    "User with this email already exists");
+        }
+
+        user.setName(request.name());
+        user.setEmail(request.email());
+
+        User updatedUser = userRepository.save(user);
+
+        return mapToResponse(updatedUser);
+    }
+
+    public void deleteUser(Long id) {
+
+        // Check if the user exists. If not, throw an exception.
+        if (!userRepository.existsById(id)) {
+            throw new UserNotFoundException("User Not Found");
+        }
+
+        // deletes the user from the database
+        userRepository.deleteById(id); 
     }
 }
