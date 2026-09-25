@@ -81,4 +81,30 @@ public class GlobalExceptionHandler {
                                 .status(HttpStatus.NOT_FOUND)
                                 .body(error);
         }
+
+        @ExceptionHandler(TransactionNotFoundException.class)
+        public ResponseEntity<ErrorResponse> handleTransactionNotFound(
+                        TransactionNotFoundException ex) {
+                ErrorResponse error = new ErrorResponse(
+                                404,
+                                ex.getMessage(),
+                                LocalDateTime.now());
+
+                return ResponseEntity
+                                .status(HttpStatus.NOT_FOUND)
+                                .body(error);
+        }
+
+        @ExceptionHandler(InsufficientBalanceException.class)
+        public ResponseEntity<ErrorResponse> handleInsufficientBalance(
+                        InsufficientBalanceException ex) {
+                ErrorResponse error = new ErrorResponse(
+                                400,
+                                ex.getMessage(),
+                                LocalDateTime.now());
+
+                return ResponseEntity
+                                .status(HttpStatus.BAD_REQUEST)
+                                .body(error);
+        }
 }
