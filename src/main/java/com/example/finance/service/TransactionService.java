@@ -1,5 +1,6 @@
 package com.example.finance.service;
 
+import com.example.finance.dto.request.TransactionFilterRequest;
 import com.example.finance.dto.request.TransactionRequest;
 import com.example.finance.dto.request.TransactionUpdateRequest;
 import com.example.finance.dto.response.TransactionResponse;
@@ -11,9 +12,11 @@ import com.example.finance.exception.InsufficientBalanceException;
 import com.example.finance.exception.TransactionNotFoundException;
 import com.example.finance.repository.AccountRepository;
 import com.example.finance.repository.TransactionRepository;
+import com.example.finance.repository.specification.TransactionSpecification;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -253,4 +256,58 @@ public class TransactionService {
                 .map(this::mapToResponse);
     }
 
+    public Page<TransactionResponse> searchTransactions(
+            TransactionFilterRequest filter,
+            Pageable pageable) {
+
+        Specification<Transaction> specification = (root, query, criteriaBuilder) -> null;
+
+        if (filter.type() != null) {
+            specification = specification.and(
+                    TransactionSpecification.hasType(
+                            filter.type()));
+        }
+
+        if (filter.category() != null
+                && !filter.category().isBlank()) {
+
+            specification = specification.and(
+                    TransactionSpecification.hasCategory(
+                            filter.category()));
+        }
+
+        if (filter.accountId() != null) {
+            specification = specification.and(
+                    TransactionSpecification.hasAccountId(
+                            filter.accountId()));
+        }
+
+        if (filter.minAmount() != null) {
+            specification = specification.and(
+                    TransactionSpecification.amountGreaterThanOrEqualTo(
+                            filter.minAmount()));
+        }
+
+        if (filter.maxAmount() != null) {
+            specification = specification.and(
+                    TransactionSpecification.amountLessThanOrEqualTo(
+                            filter.maxAmount()));
+        }
+
+        if (filter.startDate() != null) {
+            specification = specification.and(
+                    TransactionSpecification.dateGreaterThanOrEqualTo(
+                            filter.startDate()));
+        }
+
+        if (filter.endDate() != null) {
+            specification = specification.and(
+                    TransactionSpecification.dateLessThanOrEqualTo(
+                            filter.endDate()));
+        }
+
+        return transactionRepository
+                .findAll(specification, pageable)
+                .map(this::mapToResponse);
+    }
 }

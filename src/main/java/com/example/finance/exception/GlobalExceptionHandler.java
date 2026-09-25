@@ -108,9 +108,9 @@ public class GlobalExceptionHandler {
                                 .body(error);
         }
 
-        @ExceptionHandler(org.springframework.data.core.PropertyReferenceException.class)
+        @ExceptionHandler(PropertyReferenceException.class)
         public ResponseEntity<ErrorResponse> handlePropertyReferenceException(
-                        org.springframework.data.core.PropertyReferenceException ex) {
+                        PropertyReferenceException ex) {
                 ErrorResponse error = new ErrorResponse(
                                 400,
                                 "Invalid sort property: " + ex.getPropertyName(),

@@ -1,5 +1,6 @@
 package com.example.finance.controller;
 
+import com.example.finance.dto.request.TransactionFilterRequest;
 import com.example.finance.dto.request.TransactionRequest;
 import com.example.finance.dto.request.TransactionUpdateRequest;
 import com.example.finance.dto.response.TransactionResponse;
@@ -16,6 +17,8 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -36,9 +39,7 @@ public class TransactionController {
 
     @GetMapping
     public Page<TransactionResponse> getTransactions(
-            @ParameterObject
-            @PageableDefault(size = 10, sort = "transactionDate", direction = Sort.Direction.DESC)
-            Pageable pageable,
+            @ParameterObject @PageableDefault(size = 10, sort = "transactionDate", direction = Sort.Direction.DESC) Pageable pageable,
             @RequestParam(required = false) String sortBy,
             @RequestParam(required = false, defaultValue = "asc") String sortDir) {
 
@@ -94,4 +95,37 @@ public class TransactionController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/search")
+    public Page<TransactionResponse> searchTransactions(
+            @RequestParam(required = false) TransactionType type,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Long accountId,
+            @RequestParam(required = false) BigDecimal minAmount,
+            @RequestParam(required = false) BigDecimal maxAmount,
+            @RequestParam(required = false) LocalDate startDate,
+            @RequestParam(required = false) LocalDate endDate,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction) {
+        Sort.Direction sortDirection = Sort.Direction.fromString(direction);
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(sortDirection, sortBy));
+
+        TransactionFilterRequest filter = new TransactionFilterRequest(
+                type,
+                category,
+                accountId,
+                minAmount,
+                maxAmount,
+                startDate,
+                endDate);
+
+        return transactionService.searchTransactions(
+                filter,
+                pageable);
+    }
 }
