@@ -18,12 +18,12 @@ public class Account {
     @Column(nullable = false)
     private String type;
 
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(nullable = false, precision = 15, scale = 2) // Precision is the total number of digits, scale is the number of digits after the decimal
     private BigDecimal balance;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @ManyToOne(fetch = FetchType.LAZY) // Many accounts can have one user
+    @JoinColumn(name = "user_id", nullable = false) // Connect to user_id in the database
+    private User user;   // The user who owns this account
 
     public Account() {
     }
