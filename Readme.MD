@@ -269,11 +269,14 @@ Transaction updates safely adjust account balances in 5 atomic steps:
 
 ### Transaction Endpoints (`/api/transactions`)
 
-| Method | Endpoint | Description | Request Body | Success Code | Error Codes |
+| Method | Endpoint | Description | Request / Query Params | Success Code | Error Codes |
 |---|---|---|---|---|---|
 | `POST` | `/api/transactions` | Create transaction & adjust balance | `TransactionRequest` | `200 OK` | `400 BAD_REQUEST` (Validation / Insufficient Balance), `404 NOT_FOUND` (Account missing) |
-| `GET` | `/api/transactions` | Get all transactions | *None* | `200 OK` | — |
+| `GET` | `/api/transactions` | Get paginated & sorted transactions | `page` (int, default 0)<br>`size` (int, default 10)<br>`sort` (e.g. `amount,asc`)<br>`sortBy` (optional field name)<br>`sortDir` (`asc` / `desc`) | `200 OK` | `400 BAD_REQUEST` (Invalid sort field) |
 | `GET` | `/api/transactions/{id}` | Get transaction by ID | *None* | `200 OK` | `404 NOT_FOUND` |
+| `GET` | `/api/transactions/account/{accountId}` | Get transactions by Account ID | *None* | `200 OK` | — |
+| `GET` | `/api/transactions/type/{type}` | Get transactions by Type (`INCOME`, `EXPENSE`, `TRANSFER`) | *None* | `200 OK` | `400 BAD_REQUEST` |
+| `GET` | `/api/transactions/category/{category}` | Get transactions by Category | *None* | `200 OK` | — |
 | `PUT` | `/api/transactions/{id}` | Update transaction & adjust balance | `TransactionUpdateRequest` | `200 OK` | `400 BAD_REQUEST` (Validation / Insufficient Balance), `404 NOT_FOUND` |
 | `DELETE` | `/api/transactions/{id}` | Delete transaction & revert balance | *None* | `204 NO_CONTENT` | `404 NOT_FOUND` |
 

@@ -107,4 +107,30 @@ public class GlobalExceptionHandler {
                                 .status(HttpStatus.BAD_REQUEST)
                                 .body(error);
         }
+
+        @ExceptionHandler(org.springframework.data.core.PropertyReferenceException.class)
+        public ResponseEntity<ErrorResponse> handlePropertyReferenceException(
+                        org.springframework.data.core.PropertyReferenceException ex) {
+                ErrorResponse error = new ErrorResponse(
+                                400,
+                                "Invalid sort property: " + ex.getPropertyName(),
+                                LocalDateTime.now());
+
+                return ResponseEntity
+                                .status(HttpStatus.BAD_REQUEST)
+                                .body(error);
+        }
+
+        @ExceptionHandler(IllegalArgumentException.class)
+        public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
+                        IllegalArgumentException ex) {
+                ErrorResponse error = new ErrorResponse(
+                                400,
+                                ex.getMessage(),
+                                LocalDateTime.now());
+
+                return ResponseEntity
+                                .status(HttpStatus.BAD_REQUEST)
+                                .body(error);
+        }
 }

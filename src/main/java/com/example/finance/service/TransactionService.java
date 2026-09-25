@@ -11,6 +11,9 @@ import com.example.finance.exception.InsufficientBalanceException;
 import com.example.finance.exception.TransactionNotFoundException;
 import com.example.finance.repository.AccountRepository;
 import com.example.finance.repository.TransactionRepository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -181,37 +184,73 @@ public class TransactionService {
                 transaction.getAccount().getId());
     }
 
-
     @Transactional
-public void deleteTransaction(Long id) {
+    public void deleteTransaction(Long id) {
 
-    Transaction transaction = transactionRepository.findById(id)
-            .orElseThrow(() ->
-                    new TransactionNotFoundException(
-                            "Transaction Not Found"
-                    )
-            );
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new TransactionNotFoundException(
+                        "Transaction Not Found"));
 
-    Account account = transaction.getAccount();
+        Account account = transaction.getAccount();
 
-    // Reverse the transaction's effect on account balance
-    if (transaction.getType() == TransactionType.INCOME) {
+        // Reverse the transaction's effect on account balance
+        if (transaction.getType() == TransactionType.INCOME) {
 
-        account.setBalance(
-                account.getBalance()
-                        .subtract(transaction.getAmount())
-        );
+            account.setBalance(
+                    account.getBalance()
+                            .subtract(transaction.getAmount()));
 
-    } else {
+        } else {
 
-        account.setBalance(
-                account.getBalance()
-                        .add(transaction.getAmount())
-        );
+            account.setBalance(
+                    account.getBalance()
+                            .add(transaction.getAmount()));
+        }
+
+        transactionRepository.delete(transaction);
+
+        accountRepository.save(account);
     }
 
-    transactionRepository.delete(transaction);
+    public List<TransactionResponse> getTransactionsByType(
+            TransactionType type) {
+        return transactionRepository.findByType(type)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
 
-    accountRepository.save(account);
-}
+    public List<TransactionResponse> getTransactionsByCategory(
+            String category) {
+        return transactionRepository.findByCategory(category)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    public List<TransactionResponse> getTransactionsByAccountId(
+            Long accountId) {
+        return transactionRepository.findByAccountId(accountId)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    public List<TransactionResponse> getTransactionsByAccountAndType(
+            Long accountId,
+            TransactionType type) {
+        return transactionRepository
+                .findByAccountIdAndType(accountId, type)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    public Page<TransactionResponse> getTransactions(
+            Pageable pageable) {
+
+        return transactionRepository.findAll(pageable)
+                .map(this::mapToResponse);
+    }
+
 }
