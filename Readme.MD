@@ -1,14 +1,15 @@
 # Finance API Service
 
-A RESTful Microservice API built with **Spring Boot 3** and **Java 21** for managing User domain data using **Spring Data JPA** and **MySQL**.
+A comprehensive Personal Finance Management RESTful Microservice API built with **Spring Boot** and **Java 21**, managing **Users**, **Accounts**, and **Transactions** with transactional balance calculations, Spring Data JPA, and MySQL.
 
 ---
 
 ## 🛠️ Tech Stack & Dependencies
 
 * **Language**: Java 21
-* **Framework**: Spring Boot 3 (`spring-boot-starter-webmvc`, `spring-boot-starter-data-jpa`, `spring-boot-starter-validation`)
+* **Framework**: Spring Boot (`spring-boot-starter-webmvc`, `spring-boot-starter-data-jpa`, `spring-boot-starter-validation`)
 * **Database**: MySQL (`mysql-connector-j`)
+* **ORM / Persistence**: Hibernate & Spring Data JPA
 * **API Documentation**: SpringDoc OpenAPI / Swagger UI (`springdoc-openapi-starter-webmvc-ui`)
 * **Build Tool**: Maven
 
@@ -16,7 +17,7 @@ A RESTful Microservice API built with **Spring Boot 3** and **Java 21** for mana
 
 ## 📂 Project Architecture & File Structure
 
-The project follows a standard layered Java enterprise architecture with clean DTO mapping and centralized exception handling:
+The project follows a standard layered Java enterprise architecture with clean DTO record mapping, relational entities, transactional services, and centralized exception handling:
 
 ```
 src/main/java/com/example/finance/
@@ -24,25 +25,84 @@ src/main/java/com/example/finance/
 ├── config/
 │   └── SwaggerConfig.java                  # Auto-opens Swagger UI on startup
 ├── controller/
-│   └── UserController.java                 # REST Controller exposing endpoints (/api/users)
+│   ├── UserController.java                 # REST Controller for Users (/api/users)
+│   ├── AccountController.java              # REST Controller for Accounts (/api/accounts)
+│   └── TransactionController.java          # REST Controller for Transactions (/api/transactions)
 ├── service/
-│   └── UserService.java                    # Business logic, duplicate checks & DTO mapping
+│   ├── UserService.java                    # User domain logic, duplicate email checks & CRUD
+│   ├── AccountService.java                 # Account domain logic & user ownership association
+│   └── TransactionService.java             # Transactional balance processing & ledger adjustments
 ├── repository/
-│   └── UserRepository.java                 # Data access repository (Spring Data JPA) with email check
+│   ├── UserRepository.java                 # JPA Repository for User entity (existsByEmail)
+│   ├── AccountRepository.java              # JPA Repository for Account entity (findByUserId)
+│   └── TransactionRepository.java          # JPA Repository for Transaction entity (queries by account/type/category)
 ├── entity/
-│   └── User.java                           # JPA Entity for MySQL table "users"
+│   ├── User.java                           # JPA Entity for "users" table (1:N with Account)
+│   ├── Account.java                        # JPA Entity for "accounts" table (N:1 User, 1:N Transaction)
+│   ├── Transaction.java                    # JPA Entity for "transactions" table (N:1 Account)
+│   └── TransactionType.java                # Enum: INCOME, EXPENSE, TRANSFER
 ├── dto/
 │   ├── request/
-│   │   └── UserRequest.java                # Immutable record payload for user creation with validation
+│   │   ├── UserRequest.java                # Payload for user creation
+│   │   ├── UserUpdateRequest.java          # Payload for user update
+│   │   ├── AccountRequest.java             # Payload for account creation
+│   │   ├── AccountUpdateRequest.java       # Payload for account update
+│   │   ├── TransactionRequest.java         # Payload for transaction creation
+│   │   └── TransactionUpdateRequest.java   # Payload for transaction update
 │   └── response/
-│       ├── UserResponse.java               # Success response record payload
-│       ├── ValidationErrorResponse.java    # Field-level validation error response payload (400)
-│       └── ErrorResponse.java              # Standard error response structure (404, 409)
+│       ├── UserResponse.java               # User response payload
+│       ├── AccountResponse.java            # Account response payload
+│       ├── TransactionResponse.java        # Transaction response payload
+│       ├── ValidationErrorResponse.java    # Field-level validation error response (400)
+│       └── ErrorResponse.java              # Standard error response (400, 404, 409)
 └── exception/
-    ├── UserNotFoundException.java          # Custom runtime exception for missing user (404)
-    ├── UserAlreadyExistsException.java     # Custom runtime exception for duplicate email (409)
+    ├── UserNotFoundException.java          # Missing user runtime exception (404)
+    ├── UserAlreadyExistsException.java     # Duplicate email runtime exception (409)
+    ├── AccountNotFoundException.java       # Missing account runtime exception (404)
+    ├── TransactionNotFoundException.java   # Missing transaction runtime exception (404)
+    ├── InsufficientBalanceException.java   # Insufficient balance for expense runtime exception (400)
     └── GlobalExceptionHandler.java         # Centralized HTTP exception handler (@RestControllerAdvice)
 ```
+
+---
+
+## 🗄️ Relational Domain Model
+
+```mermaid
+erDiagram
+    USER ||--o{ ACCOUNT : "owns (1:N)"
+    ACCOUNT ||--o{ TRANSACTION : "records (1:N)"
+
+    USER {
+        bigint id PK
+        varchar name
+        varchar email UK
+        datetime created_at
+    }
+
+    ACCOUNT {
+        bigint id PK
+        varchar name
+        varchar type
+        decimal balance
+        bigint user_id FK
+    }
+
+    TRANSACTION {
+        bigint id PK
+        decimal amount
+        varchar type
+        varchar category
+        varchar description
+        date transaction_date
+        datetime created_at
+        bigint account_id FK
+    }
+```
+
+* **User**: Can own multiple Accounts. Email is unique across all users.
+* **Account**: Belongs to a single User. Contains a monetary balance (`precision = 15, scale = 2`).
+* **Transaction**: Belongs to an Account. Types: `INCOME`, `EXPENSE`, `TRANSFER`.
 
 ---
 
@@ -70,212 +130,316 @@ CREATE DATABASE IF NOT EXISTS FinanceDB;
 
 ---
 
-## 🚀 Step-by-Step Execution Flow
+## 🚀 Key Business Logic & Execution Flows
 
 ### 1. Application Startup Flow
 
-1. **Main Entry**: Execution begins at `main()` in `FinanceApplication.java`.
-2. **Context Load**: `SpringApplication.run(...)` initializes the Spring ApplicationContext and reads configuration from `application.properties`.
-3. **Database Schema Setup**: HikariCP connects to `jdbc:mysql://localhost:3306/FinanceDB`, and Hibernate automatically creates or updates the `users` table corresponding to the `User` entity (with unique constraint on `email`).
-4. **Bean Registration**: Spring instantiates `@Service` (`UserService`), `@RestController` (`UserController`), and generates Spring Data JPA proxy implementations for `UserRepository`.
-5. **Swagger UI Launch**: Once initialized (`ApplicationReadyEvent`), `SwaggerConfig.java` opens the system browser automatically to `http://localhost:8080/swagger-ui/index.html`.
+1. **Main Entry**: Starts at `FinanceApplication.main()`.
+2. **Context & Persistence**: Initializes Spring Boot context; Hibernate automatically verifies/updates `users`, `accounts`, and `transactions` tables with foreign keys and unique constraints.
+3. **Swagger UI Auto-Launch**: Once started, `SwaggerConfig.java` opens `http://localhost:8080/swagger-ui/index.html` in the system default browser.
 
 ---
 
-### 2. User Creation Flow (`POST /api/users`)
+### 2. User Management Flows (`/api/users`)
+
+* **Create User (`POST /api/users`)**:
+  1. Validates `UserRequest` (`@NotBlank name`, `@NotBlank @Email email`).
+  2. Checks `userRepository.existsByEmail()`. Throws `UserAlreadyExistsException` (409) if duplicate.
+  3. Saves user with `LocalDateTime.now()` and returns `UserResponse`.
+* **Update User (`PUT /api/users/{id}`)**:
+  1. Finds existing user or throws `UserNotFoundException` (404).
+  2. If the email is being changed, ensures no other user owns that email (`existsByEmail()`), otherwise throws `UserAlreadyExistsException` (409).
+  3. Updates name and email, saves, and returns `UserResponse`.
+* **Delete User (`DELETE /api/users/{id}`)**:
+  1. Checks if user exists; throws `UserNotFoundException` (404) if not found.
+  2. Deletes user record and returns `204 No Content`.
+
+---
+
+### 3. Account Management Flows (`/api/accounts`)
+
+* **Create Account (`POST /api/accounts`)**:
+  1. Validates `AccountRequest` (name, type, balance >= 0, userId).
+  2. Verifies user exists via `userRepository.findById(request.userId())`. If absent, throws `UserNotFoundException` (404).
+  3. Instantiates `Account` linked to the `User`, saves, and returns `AccountResponse`.
+* **Get Accounts by User (`GET /api/accounts/user/{userId}`)**:
+  1. Verifies user exists; throws `UserNotFoundException` (404) if missing.
+  2. Fetches all accounts owned by `userId` using `accountRepository.findByUserId(userId)`.
+* **Update Account (`PUT /api/accounts/{id}`)**:
+  1. Locates account by ID or throws `AccountNotFoundException` (404).
+  2. Updates name, type, and balance; saves and returns `AccountResponse`.
+* **Delete Account (`DELETE /api/accounts/{id}`)**:
+  1. Locates account by ID or throws `AccountNotFoundException` (404).
+  2. Deletes account and returns `204 No Content`.
+
+---
+
+### 4. Transaction Creation & Balance Calculation Flow (`POST /api/transactions`)
+
+Every transaction adjusts the corresponding account balance within a `@Transactional` boundary:
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Client
-    participant Controller as UserController
-    participant Service as UserService
-    participant Repo as UserRepository
+    participant Controller as TransactionController
+    participant Service as TransactionService
+    participant AccRepo as AccountRepository
+    participant TxRepo as TransactionRepository
     participant Handler as GlobalExceptionHandler
     participant DB as MySQL Database
 
-    Client->>Controller: POST /api/users (UserRequest JSON)
-    Note over Controller: Validates @NotBlank & @Email annotations
-    alt Invalid Payload (Validation Fails)
-        Controller-->>Handler: MethodArgumentNotValidException
-        Note over Handler: Maps field errors into ValidationErrorResponse (400)
-        Handler-->>Client: 400 BAD_REQUEST + ValidationErrorResponse JSON
-    else Valid Payload
-        Controller->>Service: createUser(UserRequest)
-        Service->>Repo: existsByEmail(request.email())
-        Repo->>DB: SELECT COUNT(*) > 0 FROM users WHERE email = ?
-        DB-->>Repo: Result (true / false)
-        Repo-->>Service: boolean exists
-        alt Email Already Exists
-            Note over Service: Throws UserAlreadyExistsException
-            Service-->>Handler: UserAlreadyExistsException intercepted
-            Note over Handler: Constructs ErrorResponse (409)
-            Handler-->>Client: 409 CONFLICT + ErrorResponse JSON
-        else Email is Unique
-            Note over Service: Instantiates User entity with current timestamp
-            Service->>Repo: save(user)
-            Repo->>DB: INSERT INTO users (name, email, created_at)
-            DB-->>Repo: Saved row with generated ID
-            Repo-->>Service: Saved User Entity
-            Note over Service: Maps User entity -> UserResponse DTO
-            Service-->>Controller: UserResponse
-            Controller-->>Client: 200 OK + UserResponse JSON
+    Client->>Controller: POST /api/transactions (TransactionRequest)
+    Controller->>Service: createTransaction(request)
+    Service->>AccRepo: findById(request.accountId())
+    alt Account Not Found
+        AccRepo-->>Service: Optional.empty()
+        Service-->>Handler: Throws AccountNotFoundException (404)
+        Handler-->>Client: 404 NOT_FOUND + ErrorResponse
+    else Account Found
+        AccRepo-->>Service: Account entity
+        alt Transaction Type is EXPENSE and balance < amount
+            Service-->>Handler: Throws InsufficientBalanceException (400)
+            Handler-->>Client: 400 BAD_REQUEST ("Insufficient account balance")
+        else Valid Balance / INCOME / TRANSFER
+            Note over Service: If INCOME: balance = balance + amount<br/>If EXPENSE/TRANSFER: balance = balance - amount
+            Service->>TxRepo: save(transaction)
+            TxRepo->>DB: INSERT INTO transactions
+            Service->>AccRepo: save(account)
+            AccRepo->>DB: UPDATE accounts SET balance = ...
+            Service-->>Controller: TransactionResponse
+            Controller-->>Client: 200 OK + TransactionResponse JSON
         end
     end
 ```
 
-1. **Client Request**: Client sends a `POST` request to `/api/users` with payload: `{"name": "John Doe", "email": "john@example.com"}`.
-2. **Input Validation**: Spring Web MVC validates `@Valid @RequestBody UserRequest request`.
-   * If any field violates constraints (e.g. blank name or malformed email), a `MethodArgumentNotValidException` is thrown.
-   * `GlobalExceptionHandler` intercepts it and returns a `400 Bad Request` with `ValidationErrorResponse` detailing each invalid field.
-3. **Duplicate Check**: `UserService.createUser()` queries `userRepository.existsByEmail(request.email())`.
-   * If the email is already registered, a `UserAlreadyExistsException` is thrown.
-   * `GlobalExceptionHandler` catches it and returns a `409 Conflict` with `ErrorResponse`.
-4. **Persistence**: If unique, a new `User` entity is created with `LocalDateTime.now()` and saved via `userRepository.save(user)`.
-5. **DTO Mapping**: The persisted `User` entity is mapped to an immutable `UserResponse` DTO and returned with `200 OK`.
+---
+
+### 5. Transaction Update Flow (`PUT /api/transactions/{id}`)
+
+Transaction updates safely adjust account balances in 5 atomic steps:
+
+1. **Fetch**: Find existing transaction or throw `TransactionNotFoundException` (404).
+2. **Reverse Old Effect**:
+   - If old type was `INCOME`: `balance = balance - oldAmount`
+   - If old type was `EXPENSE`/`TRANSFER`: `balance = balance + oldAmount`
+3. **Validate New Transaction**:
+   - If new type is `EXPENSE` and reversed `balance < newAmount`: throw `InsufficientBalanceException` (400).
+4. **Apply New Effect**:
+   - If new type is `INCOME`: `balance = balance + newAmount`
+   - If new type is `EXPENSE`/`TRANSFER`: `balance = balance - newAmount`
+5. **Persist**: Update transaction properties (`amount`, `type`, `category`, `description`, `transactionDate`), save transaction, save updated account balance, and return `TransactionResponse`.
 
 ---
 
-### 3. Fetch User by ID Flow (`GET /api/users/{id}`)
+### 6. Transaction Deletion Flow (`DELETE /api/transactions/{id}`)
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Client
-    participant Controller as UserController
-    participant Service as UserService
-    participant Repo as UserRepository
-    participant Handler as GlobalExceptionHandler
-    participant DB as MySQL Database
-
-    Client->>Controller: GET /api/users/{id}
-    Controller->>Service: getUserByID(id)
-    Service->>Repo: findById(id)
-    Repo->>DB: SELECT * FROM users WHERE id = ?
-    alt User Found
-        DB-->>Repo: User record
-        Repo-->>Service: Optional.of(user)
-        Note over Service: Maps User entity -> UserResponse DTO
-        Service-->>Controller: UserResponse
-        Controller-->>Client: 200 OK + UserResponse JSON
-    else User Not Found
-        DB-->>Repo: Empty result
-        Repo-->>Service: Optional.empty()
-        Note over Service: Throws UserNotFoundException("User Not Found")
-        Service-->>Handler: UserNotFoundException intercepted
-        Note over Handler: Constructs ErrorResponse (status 404)
-        Handler-->>Client: 404 NOT_FOUND + ErrorResponse JSON
-    end
-```
-
-1. **Client Request**: Client sends `GET /api/users/{id}`.
-2. **Repository Lookup**: `userRepository.findById(id)` executes `SELECT * FROM users WHERE id = {id}`.
-3. **Outcome**:
-   * **Found**: Entity is transformed to `UserResponse` via `mapToResponse()` and returned with `200 OK`.
-   * **Not Found**: `UserService` throws `UserNotFoundException`. `GlobalExceptionHandler` handles it and returns `404 Not Found` with `ErrorResponse`.
-
----
-
-### 4. Fetch All Users Flow (`GET /api/users`)
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Client
-    participant Controller as UserController
-    participant Service as UserService
-    participant Repo as UserRepository
-    participant DB as MySQL Database
-
-    Client->>Controller: GET /api/users
-    Controller->>Service: getUsers()
-    Service->>Repo: findAll()
-    Repo->>DB: SELECT * FROM users
-    DB-->>Repo: List of User entities
-    Repo-->>Service: List<User>
-    Note over Service: Streams list and maps entities -> UserResponse DTOs
-    Service-->>Controller: List<UserResponse>
-    Controller-->>Client: 200 OK + JSON Array of UserResponse
-```
-
-1. **Client Request**: Client sends `GET /api/users`.
-2. **Retrieval**: `userRepository.findAll()` retrieves all user records from the `users` table.
-3. **DTO Transformation**: Entities are converted using `.stream().map(this::mapToResponse).toList()`.
-4. **Response**: Returns a `200 OK` with a JSON array of `UserResponse` objects (preventing internal JPA entity leakage).
+1. Locates transaction by ID or throws `TransactionNotFoundException` (404).
+2. **Reverses** the effect on the associated account balance:
+   - If `INCOME`: `balance = balance - amount`
+   - If `EXPENSE`/`TRANSFER`: `balance = balance + amount`
+3. Deletes the transaction from `transactionRepository`.
+4. Saves updated account balance to `accountRepository`.
+5. Returns `204 No Content`.
 
 ---
 
 ## 📡 API Endpoints Summary
 
-| Method | Endpoint | Description | Request Body | Status Code | Response Body |
+### User Endpoints (`/api/users`)
+
+| Method | Endpoint | Description | Request Body | Success Code | Error Codes |
 |---|---|---|---|---|---|
-| `POST` | `/api/users` | Create a new user | `UserRequest` | `200 OK`<br>`400 BAD_REQUEST`<br>`409 CONFLICT` | `UserResponse`<br>`ValidationErrorResponse`<br>`ErrorResponse` |
-| `GET` | `/api/users` | Retrieve all users | *None* | `200 OK` | `List<UserResponse>` |
-| `GET` | `/api/users/{id}` | Retrieve user by ID | *None* | `200 OK`<br>`404 NOT_FOUND` | `UserResponse`<br>`ErrorResponse` |
+| `POST` | `/api/users` | Create user | `UserRequest` | `200 OK` | `400 BAD_REQUEST`, `409 CONFLICT` |
+| `GET` | `/api/users` | Get all users | *None* | `200 OK` | — |
+| `GET` | `/api/users/{id}` | Get user by ID | *None* | `200 OK` | `404 NOT_FOUND` |
+| `PUT` | `/api/users/{id}` | Update user | `UserUpdateRequest` | `200 OK` | `400 BAD_REQUEST`, `404 NOT_FOUND`, `409 CONFLICT` |
+| `DELETE` | `/api/users/{id}` | Delete user | *None* | `204 NO_CONTENT` | `404 NOT_FOUND` |
+
+### Account Endpoints (`/api/accounts`)
+
+| Method | Endpoint | Description | Request Body | Success Code | Error Codes |
+|---|---|---|---|---|---|
+| `POST` | `/api/accounts` | Create account | `AccountRequest` | `200 OK` | `400 BAD_REQUEST`, `404 NOT_FOUND` (User missing) |
+| `GET` | `/api/accounts` | Get all accounts | *None* | `200 OK` | — |
+| `GET` | `/api/accounts/{id}` | Get account by ID | *None* | `200 OK` | `404 NOT_FOUND` |
+| `GET` | `/api/accounts/user/{userId}` | Get accounts by User ID | *None* | `200 OK` | `404 NOT_FOUND` (User missing) |
+| `PUT` | `/api/accounts/{id}` | Update account | `AccountUpdateRequest` | `200 OK` | `400 BAD_REQUEST`, `404 NOT_FOUND` |
+| `DELETE` | `/api/accounts/{id}` | Delete account | *None* | `204 NO_CONTENT` | `404 NOT_FOUND` |
+
+### Transaction Endpoints (`/api/transactions`)
+
+| Method | Endpoint | Description | Request Body | Success Code | Error Codes |
+|---|---|---|---|---|---|
+| `POST` | `/api/transactions` | Create transaction & adjust balance | `TransactionRequest` | `200 OK` | `400 BAD_REQUEST` (Validation / Insufficient Balance), `404 NOT_FOUND` (Account missing) |
+| `GET` | `/api/transactions` | Get all transactions | *None* | `200 OK` | — |
+| `GET` | `/api/transactions/{id}` | Get transaction by ID | *None* | `200 OK` | `404 NOT_FOUND` |
+| `PUT` | `/api/transactions/{id}` | Update transaction & adjust balance | `TransactionUpdateRequest` | `200 OK` | `400 BAD_REQUEST` (Validation / Insufficient Balance), `404 NOT_FOUND` |
+| `DELETE` | `/api/transactions/{id}` | Delete transaction & revert balance | *None* | `204 NO_CONTENT` | `404 NOT_FOUND` |
 
 ---
 
 ## 📋 Request & Response Models
 
-### 1. Request DTO (`UserRequest`)
+### 1. User Models
 
+#### `UserRequest` (Create)
 ```json
 {
   "name": "John Doe",
   "email": "john.doe@example.com"
 }
 ```
-
 * `name`: `@NotBlank(message = "Name is required")`
 * `email`: `@NotBlank(message = "Email is required")`, `@Email(message = "Invalid email format")`
 
----
+#### `UserUpdateRequest` (Update)
+```json
+{
+  "name": "John Doe Updated",
+  "email": "john.updated@example.com"
+}
+```
 
-### 2. Success Response DTO (`UserResponse`)
-
+#### `UserResponse`
 ```json
 {
   "id": 1,
   "name": "John Doe",
   "email": "john.doe@example.com",
-  "createdAt": "2026-09-23T21:40:00"
+  "createdAt": "2026-09-25T10:15:30"
 }
 ```
 
 ---
 
-### 3. Validation Error Response (`ValidationErrorResponse` - HTTP 400)
+### 2. Account Models
 
+#### `AccountRequest` (Create)
+```json
+{
+  "name": "Checking Account",
+  "type": "CHECKING",
+  "balance": 1500.00,
+  "userId": 1
+}
+```
+* `name`: `@NotBlank(message = "Account name is required")`
+* `type`: `@NotBlank(message = "Account type is required")`
+* `balance`: `@NotNull(message = "Balance is required")`, `@DecimalMin(value = "0.0", message = "Balance cannot be negative")`
+* `userId`: `@NotNull(message = "User ID is required")`
+
+#### `AccountUpdateRequest` (Update)
+```json
+{
+  "name": "Primary Savings",
+  "type": "SAVINGS",
+  "balance": 2000.00
+}
+```
+
+#### `AccountResponse`
+```json
+{
+  "id": 1,
+  "name": "Checking Account",
+  "type": "CHECKING",
+  "balance": 1500.00,
+  "userId": 1
+}
+```
+
+---
+
+### 3. Transaction Models
+
+#### `TransactionRequest` (Create)
+```json
+{
+  "amount": 250.75,
+  "type": "EXPENSE",
+  "category": "Groceries",
+  "description": "Weekly supermarket shopping",
+  "transactionDate": "2026-09-25",
+  "accountId": 1
+}
+```
+* `amount`: `@NotNull(message = "Amount is required")`, `@DecimalMin(value = "0.01", message = "Amount must be greater than 0")`
+* `type`: `@NotNull(message = "Transaction type is required")` (Values: `INCOME`, `EXPENSE`, `TRANSFER`)
+* `category`: `@NotBlank(message = "Category is required")`
+* `description`: Optional text
+* `transactionDate`: `@NotNull(message = "Transaction date is required")` (`YYYY-MM-DD`)
+* `accountId`: `@NotNull(message = "Account ID is required")`
+
+#### `TransactionUpdateRequest` (Update)
+```json
+{
+  "amount": 300.00,
+  "type": "EXPENSE",
+  "category": "Groceries",
+  "description": "Weekly supermarket shopping with extras",
+  "transactionDate": "2026-09-25"
+}
+```
+
+#### `TransactionResponse`
+```json
+{
+  "id": 1,
+  "amount": 250.75,
+  "type": "EXPENSE",
+  "category": "Groceries",
+  "description": "Weekly supermarket shopping",
+  "transactionDate": "2026-09-25",
+  "createdAt": "2026-09-25T11:00:00",
+  "accountId": 1
+}
+```
+
+---
+
+### 4. Centralized Error Responses
+
+#### Validation Error (HTTP 400 - `ValidationErrorResponse`)
+Returned when request body validation fails (`MethodArgumentNotValidException`):
 ```json
 {
   "status": 400,
   "errors": {
-    "name": "Name is required",
-    "email": "Invalid email format"
+    "amount": "Amount must be greater than 0",
+    "category": "Category is required"
   },
-  "timestamp": "2026-09-23T21:40:00"
+  "timestamp": "2026-09-25T11:00:00"
 }
 ```
 
----
+#### Insufficient Balance Error (HTTP 400 - `ErrorResponse`)
+Returned when an `EXPENSE` transaction exceeds the account balance:
+```json
+{
+  "status": 400,
+  "message": "Insufficient account balance",
+  "timestamp": "2026-09-25T11:00:00"
+}
+```
 
-### 4. Standard Error Response (`ErrorResponse` - HTTP 404 / 409)
-
-#### 404 Not Found (User ID not found):
+#### Resource Not Found Error (HTTP 404 - `ErrorResponse`)
+Returned when a User, Account, or Transaction is not found:
 ```json
 {
   "status": 404,
-  "message": "User Not Found",
-  "timestamp": "2026-09-23T21:40:00"
+  "message": "Account Not Found",
+  "timestamp": "2026-09-25T11:00:00"
 }
 ```
 
-#### 409 Conflict (Duplicate email):
+#### Conflict Error (HTTP 409 - `ErrorResponse`)
+Returned when attempting to register or update to an existing email:
 ```json
 {
   "status": 409,
   "message": "User with this email already exists",
-  "timestamp": "2026-09-23T21:40:00"
+  "timestamp": "2026-09-25T11:00:00"
 }
 ```
 
@@ -283,7 +447,9 @@ sequenceDiagram
 
 ## 📖 Swagger Documentation UI
 
-Once the application is running, Swagger UI is automatically opened in the default browser at:
+Once the application is running, Swagger UI is automatically opened in your default browser at:
 ```
 http://localhost:8080/swagger-ui/index.html
 ```
+You can also inspect the raw OpenAPI JSON specification at `http://localhost:8080/v3/api-docs`.
+
