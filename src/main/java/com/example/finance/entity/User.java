@@ -23,6 +23,10 @@ public class User {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    // why? - mappedBy is used to specify the field in the other entity that is
+    // the owner of the relationship
+    // why? - fetch = FetchType.LAZY is used to specify that the accounts should be
+    // loaded lazily
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private List<Account> accounts = new ArrayList<>();
 

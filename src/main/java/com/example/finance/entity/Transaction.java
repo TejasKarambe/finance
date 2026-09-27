@@ -7,7 +7,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "transactions")
+@Table(name = "transactions", indexes = {
+        @Index(name = "idx_transaction_account", columnList = "account_id"),
+        @Index(name = "idx_transaction_date", columnList = "transaction_date"),
+        @Index(name = "idx_transaction_type", columnList = "type"),
+        @Index(name = "idx_transaction_category", columnList = "category")
+})
 public class Transaction {
 
     @Id
@@ -31,7 +36,10 @@ public class Transaction {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
-
+    // old
+    // @ManyToOne(fetch = FetchType.LAZY)
+    // @JoinColumn(name = "account_id", nullable = false)
+    // new
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
     private Account account;
@@ -46,8 +54,7 @@ public class Transaction {
             String description,
             LocalDate transactionDate,
             LocalDateTime createdAt,
-            Account account
-    ) {
+            Account account) {
         this.amount = amount;
         this.type = type;
         this.category = category;
