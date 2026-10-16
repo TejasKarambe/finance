@@ -14,6 +14,7 @@ public class ReportService {
 
     private final TransactionRepository transactionRepository;
 
+    // Constructor Injection
     public ReportService(
             TransactionRepository transactionRepository) {
         this.transactionRepository = transactionRepository;

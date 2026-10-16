@@ -29,6 +29,7 @@ public class ReportController {
         return reportService.getMonthlyReport(year, month);
     }
 
+    @Operation(summary = "Get category expenses")
     @GetMapping("/monthly/category")
     public List<CategoryExpenseResponse> getCategoryExpenses(
             @RequestParam int year,

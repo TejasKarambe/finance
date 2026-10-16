@@ -26,6 +26,7 @@ public interface TransactionRepository
             Long accountId,
             TransactionType type);
 
+    // JPQL query
     @Query("""
             SELECT COALESCE(SUM(t.amount), 0)
             FROM Transaction t

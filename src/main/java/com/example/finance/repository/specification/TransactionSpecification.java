@@ -9,6 +9,8 @@ import java.time.LocalDate;
 
 public class TransactionSpecification {
 
+    // Specification<Transaction> is a functional interface that represents a specification
+    // It is used to create dynamic queries
     public static Specification<Transaction> hasType(
             TransactionType type) {
         return (root, query, criteriaBuilder) -> criteriaBuilder.equal(

@@ -46,7 +46,7 @@ public class AccountService {
 
         return accountRepository.findAll()
                 .stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponse) // for each account, map it to AccountResponse using mapToResponse method
                 .toList();
     }
 
