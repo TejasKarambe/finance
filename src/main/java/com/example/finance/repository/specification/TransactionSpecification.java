@@ -9,54 +9,39 @@ import java.time.LocalDate;
 
 public class TransactionSpecification {
 
-    // Specification<Transaction> is a functional interface that represents a specification
-    // It is used to create dynamic queries
-    public static Specification<Transaction> hasType(
-            TransactionType type) {
-        return (root, query, criteriaBuilder) -> criteriaBuilder.equal(
-                root.get("type"),
-                type);
+    public static Specification<Transaction> hasUserId(Long userId) {
+        return (root, query, cb) -> cb.equal(root.get("account").get("user").get("id"), userId);
     }
 
-    public static Specification<Transaction> hasCategory(
-            String category) {
-        return (root, query, criteriaBuilder) -> criteriaBuilder.equal(
-                root.get("category"),
-                category);
+    public static Specification<Transaction> descriptionContains(String search) {
+        return (root, query, cb) -> cb.like(cb.lower(root.get("description")), "%" + search.toLowerCase() + "%");
     }
 
-    public static Specification<Transaction> hasAccountId(
-            Long accountId) {
-        return (root, query, criteriaBuilder) -> criteriaBuilder.equal(
-                root.get("account").get("id"),
-                accountId);
+    public static Specification<Transaction> hasType(TransactionType type) {
+        return (root, query, cb) -> cb.equal(root.get("type"), type);
     }
 
-    public static Specification<Transaction> amountGreaterThanOrEqualTo(
-            BigDecimal amount) {
-        return (root, query, criteriaBuilder) -> criteriaBuilder.greaterThanOrEqualTo(
-                root.get("amount"),
-                amount);
+    public static Specification<Transaction> hasCategory(String category) {
+        return (root, query, cb) -> cb.equal(root.get("category"), category);
     }
 
-    public static Specification<Transaction> amountLessThanOrEqualTo(
-            BigDecimal amount) {
-        return (root, query, criteriaBuilder) -> criteriaBuilder.lessThanOrEqualTo(
-                root.get("amount"),
-                amount);
+    public static Specification<Transaction> hasAccountId(Long accountId) {
+        return (root, query, cb) -> cb.equal(root.get("account").get("id"), accountId);
     }
 
-    public static Specification<Transaction> dateGreaterThanOrEqualTo(
-            LocalDate startDate) {
-        return (root, query, criteriaBuilder) -> criteriaBuilder.greaterThanOrEqualTo(
-                root.get("transactionDate"),
-                startDate);
+    public static Specification<Transaction> amountGreaterThanOrEqualTo(BigDecimal amount) {
+        return (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("amount"), amount);
     }
 
-    public static Specification<Transaction> dateLessThanOrEqualTo(
-            LocalDate endDate) {
-        return (root, query, criteriaBuilder) -> criteriaBuilder.lessThanOrEqualTo(
-                root.get("transactionDate"),
-                endDate);
+    public static Specification<Transaction> amountLessThanOrEqualTo(BigDecimal amount) {
+        return (root, query, cb) -> cb.lessThanOrEqualTo(root.get("amount"), amount);
+    }
+
+    public static Specification<Transaction> dateGreaterThanOrEqualTo(LocalDate startDate) {
+        return (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("transactionDate"), startDate);
+    }
+
+    public static Specification<Transaction> dateLessThanOrEqualTo(LocalDate endDate) {
+        return (root, query, cb) -> cb.lessThanOrEqualTo(root.get("transactionDate"), endDate);
     }
 }

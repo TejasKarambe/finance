@@ -1,7 +1,6 @@
 package com.example.finance.entity;
 
 import jakarta.persistence.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -11,7 +10,8 @@ import java.time.LocalDateTime;
         @Index(name = "idx_transaction_account", columnList = "account_id"),
         @Index(name = "idx_transaction_date", columnList = "transaction_date"),
         @Index(name = "idx_transaction_type", columnList = "type"),
-        @Index(name = "idx_transaction_category", columnList = "category")
+        @Index(name = "idx_transaction_category", columnList = "category"),
+        @Index(name = "idx_transaction_user", columnList = "user_id")
 })
 public class Transaction {
 
@@ -29,20 +29,25 @@ public class Transaction {
     @Column(nullable = false)
     private String category;
 
+    @Column(length = 500)
     private String description;
+
+    @Column(nullable = false, length = 30)
+    private String paymentMethod = "OTHER";
 
     @Column(nullable = false)
     private LocalDate transactionDate;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
-    // old
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "account_id", nullable = false)
-    // new
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
     private Account account;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     public Transaction() {
     }
@@ -55,13 +60,28 @@ public class Transaction {
             LocalDate transactionDate,
             LocalDateTime createdAt,
             Account account) {
+        this(amount, type, category, description, "OTHER", transactionDate, createdAt, account, account != null ? account.getUser() : null);
+    }
+
+    public Transaction(
+            BigDecimal amount,
+            TransactionType type,
+            String category,
+            String description,
+            String paymentMethod,
+            LocalDate transactionDate,
+            LocalDateTime createdAt,
+            Account account,
+            User user) {
         this.amount = amount;
         this.type = type;
         this.category = category;
         this.description = description;
+        this.paymentMethod = paymentMethod != null && !paymentMethod.isBlank() ? paymentMethod : "OTHER";
         this.transactionDate = transactionDate;
         this.createdAt = createdAt;
         this.account = account;
+        this.user = user != null ? user : (account != null ? account.getUser() : null);
     }
 
     public Long getId() {
@@ -100,6 +120,14 @@ public class Transaction {
         this.description = description;
     }
 
+    public String getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(String paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
     public LocalDate getTransactionDate() {
         return transactionDate;
     }
@@ -118,5 +146,16 @@ public class Transaction {
 
     public void setAccount(Account account) {
         this.account = account;
+        if (this.user == null && account != null) {
+            this.user = account.getUser();
+        }
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 }

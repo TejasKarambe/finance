@@ -4,12 +4,10 @@ import com.example.finance.entity.TransactionType;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record TransactionUpdateRequest(
-
         @NotNull(message = "Amount is required")
         @DecimalMin(value = "0.01", message = "Amount must be greater than 0")
         BigDecimal amount,
@@ -22,7 +20,17 @@ public record TransactionUpdateRequest(
 
         String description,
 
+        String paymentMethod,
+
         @NotNull(message = "Transaction date is required")
         LocalDate transactionDate
 ) {
+    public TransactionUpdateRequest(
+            BigDecimal amount,
+            TransactionType type,
+            String category,
+            String description,
+            LocalDate transactionDate) {
+        this(amount, type, category, description, "OTHER", transactionDate);
+    }
 }
