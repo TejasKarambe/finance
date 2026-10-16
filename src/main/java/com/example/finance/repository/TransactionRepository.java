@@ -28,6 +28,64 @@ public interface TransactionRepository
 
     List<Transaction> findByAccountIdAndType(Long accountId, TransactionType type);
 
+    long countByAccountUserId(Long userId);
+
+    @Query("""
+            SELECT COALESCE(SUM(t.amount), 0)
+            FROM Transaction t
+            WHERE t.account.user.id = :userId
+            AND t.type = :type
+            """)
+    BigDecimal getTotalByTypeAndUserId(
+            @Param("userId") Long userId,
+            @Param("type") TransactionType type);
+
+    @Query("""
+            SELECT COALESCE(SUM(t.amount), 0)
+            FROM Transaction t
+            WHERE t.account.user.id = :userId
+            AND t.type = :type
+            AND t.transactionDate >= :startDate
+            AND t.transactionDate <= :endDate
+            """)
+    BigDecimal getTotalByTypeAndDateRangeAndUserId(
+            @Param("userId") Long userId,
+            @Param("type") TransactionType type,
+            @Param("startDate") java.time.LocalDate startDate,
+            @Param("endDate") java.time.LocalDate endDate);
+
+    @Query("""
+            SELECT
+                t.category AS category,
+                SUM(t.amount) AS totalAmount
+            FROM Transaction t
+            WHERE t.account.user.id = :userId
+            AND t.type = :type
+            AND t.transactionDate >= :startDate
+            AND t.transactionDate <= :endDate
+            GROUP BY t.category
+            ORDER BY SUM(t.amount) DESC
+            """)
+    List<CategoryExpenseProjection> getCategoryTotalsByDateRangeAndUserId(
+            @Param("userId") Long userId,
+            @Param("type") TransactionType type,
+            @Param("startDate") java.time.LocalDate startDate,
+            @Param("endDate") java.time.LocalDate endDate);
+
+    @Query("""
+            SELECT
+                t.category AS category,
+                SUM(t.amount) AS totalAmount
+            FROM Transaction t
+            WHERE t.account.user.id = :userId
+            AND t.type = :type
+            GROUP BY t.category
+            ORDER BY SUM(t.amount) DESC
+            """)
+    List<CategoryExpenseProjection> getCategoryTotalsByAllTimeAndUserId(
+            @Param("userId") Long userId,
+            @Param("type") TransactionType type);
+
     @Query("""
             SELECT COALESCE(SUM(t.amount), 0)
             FROM Transaction t
