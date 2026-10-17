@@ -4,6 +4,10 @@ import java.math.BigDecimal;
 
 public record CategoryExpenseResponse(
         String category,
-        BigDecimal totalAmount
+        BigDecimal totalAmount,
+        Double percentage
 ) {
+    public CategoryExpenseResponse(String category, BigDecimal totalAmount) {
+        this(category, totalAmount, 0.0);
+    }
 }
