@@ -92,6 +92,9 @@ public class AccountService {
         if (request.balance() != null) {
             account.setBalance(request.balance());
         }
+        if (request.currency() != null && !request.currency().isBlank()) {
+            account.setCurrency(request.currency().trim().toUpperCase());
+        }
 
         Account updatedAccount = accountRepository.save(account);
         return mapToResponse(updatedAccount);
@@ -124,8 +127,11 @@ public class AccountService {
         // Deduct from source account
         sourceAccount.setBalance(sourceAccount.getBalance().subtract(request.amount()));
 
-        // Add to destination account
-        destinationAccount.setBalance(destinationAccount.getBalance().add(request.amount()));
+        // Add to destination account (supports converted amount if provided)
+        BigDecimal destCredit = request.destinationAmount() != null && request.destinationAmount().compareTo(BigDecimal.ZERO) > 0
+                ? request.destinationAmount()
+                : request.amount();
+        destinationAccount.setBalance(destinationAccount.getBalance().add(destCredit));
 
         accountRepository.save(sourceAccount);
         accountRepository.save(destinationAccount);
@@ -147,8 +153,14 @@ public class AccountService {
         );
         transactionRepository.save(transferTx);
 
+        String srcCurr = sourceAccount.getCurrency() != null ? sourceAccount.getCurrency() : "USD";
+        String dstCurr = destinationAccount.getCurrency() != null ? destinationAccount.getCurrency() : "USD";
+        String message = srcCurr.equalsIgnoreCase(dstCurr)
+                ? "Transfer of " + srcCurr + " " + request.amount() + " completed successfully"
+                : "Transfer of " + srcCurr + " " + request.amount() + " (" + dstCurr + " " + destCredit + ") completed successfully";
+
         return new TransferResponse(
-                "Transfer of $" + request.amount() + " completed successfully",
+                message,
                 sourceAccount.getId(),
                 sourceAccount.getName(),
                 sourceAccount.getBalance(),

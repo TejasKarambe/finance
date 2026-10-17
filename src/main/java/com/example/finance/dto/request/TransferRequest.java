@@ -16,8 +16,13 @@ public record TransferRequest(
         @DecimalMin(value = "0.01", message = "Transfer amount must be greater than 0")
         BigDecimal amount,
 
+        BigDecimal destinationAmount,
+
         String description,
 
         LocalDate transferDate
 ) {
+    public TransferRequest(Long sourceAccountId, Long destinationAccountId, BigDecimal amount, String description, LocalDate transferDate) {
+        this(sourceAccountId, destinationAccountId, amount, null, description, transferDate);
+    }
 }

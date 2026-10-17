@@ -16,7 +16,12 @@ public record AccountUpdateRequest(
 
         @NotNull(message = "Balance is required")
         @DecimalMin(value = "0.0", message = "Balance cannot be negative")
-        BigDecimal balance
+        BigDecimal balance,
+
+        String currency
 
 ) {
+    public AccountUpdateRequest(String name, String type, BigDecimal balance) {
+        this(name, type, balance, null);
+    }
 }
