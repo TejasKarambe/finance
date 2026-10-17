@@ -15,9 +15,9 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-        @ExceptionHandler(UserNotFoundException.class)
-        public ResponseEntity<ErrorResponse> handleUserNotFound(
-                        UserNotFoundException ex) {
+        @ExceptionHandler({UserNotFoundException.class, ResourceNotFoundException.class})
+        public ResponseEntity<ErrorResponse> handleNotFound(
+                        RuntimeException ex) {
 
                 ErrorResponse error = new ErrorResponse(
                                 404,

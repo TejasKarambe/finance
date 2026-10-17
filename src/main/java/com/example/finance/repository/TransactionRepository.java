@@ -55,6 +55,22 @@ public interface TransactionRepository
             @Param("endDate") java.time.LocalDate endDate);
 
     @Query("""
+            SELECT COALESCE(SUM(t.amount), 0)
+            FROM Transaction t
+            WHERE t.account.user.id = :userId
+            AND t.type = :type
+            AND t.category = :category
+            AND t.transactionDate >= :startDate
+            AND t.transactionDate <= :endDate
+            """)
+    BigDecimal getTotalByTypeAndCategoryAndDateRangeAndUserId(
+            @Param("userId") Long userId,
+            @Param("type") TransactionType type,
+            @Param("category") String category,
+            @Param("startDate") java.time.LocalDate startDate,
+            @Param("endDate") java.time.LocalDate endDate);
+
+    @Query("""
             SELECT
                 t.category AS category,
                 SUM(t.amount) AS totalAmount
