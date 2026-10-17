@@ -79,4 +79,12 @@ public class ReportController {
 
         reportService.exportTransactionsCsv(userId, response.getWriter());
     }
+
+    @Operation(summary = "Export complete user financial backup including accounts, transactions, budgets, recurring rules, and goals in JSON format")
+    @GetMapping("/export/json")
+    public ResponseEntity<com.example.finance.dto.response.FullDataBackupResponse> exportFullJson(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        Long userId = principal != null ? principal.getId() : null;
+        return ResponseEntity.ok(reportService.getFullDataBackup(userId));
+    }
 }

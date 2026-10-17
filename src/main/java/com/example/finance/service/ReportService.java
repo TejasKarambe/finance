@@ -1,9 +1,6 @@
 package com.example.finance.service;
 
-import com.example.finance.dto.response.CategoryExpenseResponse;
-import com.example.finance.dto.response.MonthlyFlowItem;
-import com.example.finance.dto.response.MonthlyReportResponse;
-import com.example.finance.dto.response.YearlyReportResponse;
+import com.example.finance.dto.response.*;
 import com.example.finance.entity.Transaction;
 import com.example.finance.entity.TransactionType;
 import com.example.finance.repository.TransactionRepository;
@@ -16,6 +13,7 @@ import java.io.Writer;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.Month;
 import java.time.YearMonth;
 import java.time.format.TextStyle;
@@ -29,9 +27,22 @@ import java.util.Locale;
 public class ReportService {
 
     private final TransactionRepository transactionRepository;
+    private final AccountService accountService;
+    private final BudgetService budgetService;
+    private final RecurringTransactionService recurringService;
+    private final SavingsGoalService goalService;
 
-    public ReportService(TransactionRepository transactionRepository) {
+    public ReportService(
+            TransactionRepository transactionRepository,
+            AccountService accountService,
+            BudgetService budgetService,
+            RecurringTransactionService recurringService,
+            SavingsGoalService goalService) {
         this.transactionRepository = transactionRepository;
+        this.accountService = accountService;
+        this.budgetService = budgetService;
+        this.recurringService = recurringService;
+        this.goalService = goalService;
     }
 
     public MonthlyReportResponse getMonthlyReport(Long userId, int year, int month) {
@@ -197,5 +208,39 @@ public class ReportService {
     private String escapeCsv(String input) {
         if (input == null) return "";
         return input.replace("\"", "\"\"");
+    }
+
+    public FullDataBackupResponse getFullDataBackup(Long userId) {
+        List<AccountResponse> accounts = accountService.getAccountsByUserId(userId);
+        List<TransactionResponse> transactions = transactionRepository.findByAccountUserId(userId)
+                .stream()
+                .sorted(Comparator.comparing(Transaction::getTransactionDate).reversed())
+                .map(tx -> new TransactionResponse(
+                        tx.getId(),
+                        tx.getAmount(),
+                        tx.getType(),
+                        tx.getCategory(),
+                        tx.getDescription(),
+                        tx.getPaymentMethod(),
+                        tx.getTransactionDate(),
+                        tx.getCreatedAt(),
+                        tx.getAccount() != null ? tx.getAccount().getId() : null,
+                        tx.getAccount() != null ? tx.getAccount().getName() : "N/A",
+                        userId
+                ))
+                .toList();
+        List<BudgetResponse> budgets = budgetService.getBudgets(userId, null, null);
+        List<RecurringTransactionResponse> recurring = recurringService.getRecurringTransactions(userId);
+        List<SavingsGoalResponse> goals = goalService.getGoals(userId);
+
+        return new FullDataBackupResponse(
+                LocalDateTime.now(),
+                userId,
+                accounts,
+                transactions,
+                budgets,
+                recurring,
+                goals
+        );
     }
 }

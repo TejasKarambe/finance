@@ -19,9 +19,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+import com.example.finance.dto.response.CsvImportResponse;
 
 @RestController
 @RequestMapping("/api/transactions")
@@ -148,5 +153,45 @@ public class TransactionController {
     @Operation(summary = "Get transactions by category")
     public ResponseEntity<List<TransactionResponse>> getTransactionsByCategory(@PathVariable String category) {
         return ResponseEntity.ok(transactionService.getTransactionsByCategory(category));
+    }
+
+    @PostMapping(value = "/import-csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Import transactions from a spreadsheet CSV file")
+    public ResponseEntity<CsvImportResponse> importCsv(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        Long userId = principal != null ? principal.getId() : null;
+        try {
+            CsvImportResponse response = transactionService.importCsv(userId, file.getInputStream());
+            return ResponseEntity.ok(response);
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body(new CsvImportResponse(
+                    0, 0, 0, List.of("Failed to read uploaded file: " + e.getMessage()), "Error reading file"
+            ));
+        }
+    }
+
+    @GetMapping("/export/csv")
+    @Operation(summary = "Export filtered transactions as a downloaded CSV file")
+    public void exportCsv(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) TransactionType type,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Long accountId,
+            @RequestParam(required = false) LocalDate startDate,
+            @RequestParam(required = false) LocalDate endDate,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletResponse response) throws IOException {
+
+        Long userId = principal != null ? principal.getId() : null;
+        TransactionFilterRequest filter = new TransactionFilterRequest(
+                search, type, category, accountId, null, null, startDate, endDate
+        );
+
+        response.setContentType("text/csv");
+        response.setCharacterEncoding("UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=\"transactions_export_" + LocalDate.now() + ".csv\"");
+
+        transactionService.exportFilteredCsv(userId, filter, response.getWriter());
     }
 }
