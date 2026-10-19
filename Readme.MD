@@ -1,82 +1,163 @@
-# Finance API Service
+# 💰 ApexFinance API Service
 
-A comprehensive Personal Finance Management RESTful Microservice API built with **Spring Boot** and **Java 21**, managing **Users**, **Accounts**, and **Transactions** with transactional balance calculations, Spring Data JPA, and MySQL.
+A high-performance, enterprise-grade Personal Finance Management RESTful Microservice API built with **Spring Boot 4 / Java 21**, **Spring Security & Stateless JWT**, **Spring Data JPA**, **Hibernate**, and **PostgreSQL (Neon Serverless)**.
+
+The service provides comprehensive personal financial management, featuring multi-account ledgers, atomic transaction processing with automatic balance reconciliation, inter-account fund transfers, category-based monthly budgets with threshold alerts, scheduled recurring transactions & subscriptions, milestone-driven savings goals, AI spending insights, financial reports, and CSV / JSON data import/export.
 
 ---
 
 ## 🛠️ Tech Stack & Dependencies
 
-* **Language**: Java 21
+* **Language**: Java 21 (LTS)
 * **Framework**: Spring Boot (`spring-boot-starter-webmvc`, `spring-boot-starter-data-jpa`, `spring-boot-starter-validation`)
-* **Database**: MySQL (`mysql-connector-j`)
-* **ORM / Persistence**: Hibernate & Spring Data JPA
-* **API Documentation**: SpringDoc OpenAPI / Swagger UI (`springdoc-openapi-starter-webmvc-ui`)
-* **Build Tool**: Maven
+* **Security & Authentication**: Spring Security 6, Stateless JWT (`io.jsonwebtoken:jjwt-api:0.12.6`), BCrypt Password Encoder
+* **Database & ORM**: PostgreSQL (`org.postgresql:postgresql`), Hibernate, Spring Data JPA, HikariCP Connection Pooling
+* **API Documentation**: SpringDoc OpenAPI 3 / Swagger UI (`springdoc-openapi-starter-webmvc-ui:2.8.13`)
+* **Build Tool**: Maven Wrapper (`mvnw` / `mvnw.cmd`)
+* **Containerization**: Multi-stage Dockerfile (`eclipse-temurin:21-jdk` -> `eclipse-temurin:21-jre`)
+* **Cloud Deployment**: Render Web Service (`render.yaml`) with dynamic `$PORT` binding
 
 ---
 
-## 📂 Project Architecture & File Structure
+## 🌟 Key Functional Modules
 
-The project follows a standard layered Java enterprise architecture with clean DTO record mapping, relational entities, transactional services, and centralized exception handling:
+1. **🔐 Authentication & User Isolation (`/api/auth`)**:
+   - Secure registration and login using BCrypt password hashing.
+   - Stateless JWT Bearer token generation and verification (`app.jwt.secret`, `86400000ms` / 24h validity).
+   - Dynamic user scoping: All financial data (accounts, transactions, budgets, goals, recurring rules) is strictly isolated to the authenticated user.
+2. **💳 Account Portfolio & Inter-Account Transfers (`/api/accounts`)**:
+   - Support for multiple account types: `BANK`, `CASH`, `SAVINGS`, `CREDIT_CARD`, `INVESTMENT`.
+   - Opening balance tracking and real-time ledger balance calculations.
+   - Atomic fund transfers between accounts (`POST /api/accounts/transfer`) with optional currency conversion amounts—adjusting balances without distorting income/expense metrics.
+3. **📊 Atomic Transaction Processing & Multi-Filter Ledger (`/api/transactions`)**:
+   - Types: `INCOME`, `EXPENSE`, `TRANSFER`.
+   - Atomic balance updates: Adjusts account balances automatically within `@Transactional` boundaries upon creation, modification, or deletion, backed by insufficient balance safeguards.
+   - Dynamic search & filtering powered by JPA Specifications (`search`, `type`, `category`, `accountId`, `minAmount`, `maxAmount`, `startDate`, `endDate`).
+   - Pageable sorting and pagination.
+   - Multipart spreadsheet CSV import (`/import-csv`) and filtered CSV export (`/export/csv`).
+4. **🎯 Category Budgeting & Threshold Alerts (`/api/budgets`)**:
+   - Monthly category limit allocations with unique user-category-period constraints.
+   - Live budget health monitoring (`/status`) with automated threshold calculation:
+     - `NORMAL`: < 80% spent
+     - `WARNING`: 80% – 99.9% spent
+     - `EXCEEDED`: ≥ 100% spent
+5. **🔄 Scheduled Recurring Transactions (`/api/recurring-transactions`)**:
+   - Automated tracking for subscriptions, utility bills, rent, and salaries.
+   - 6 recurrence frequencies: `DAILY`, `WEEKLY`, `BIWEEKLY`, `MONTHLY`, `QUARTERLY`, `YEARLY`.
+   - Automatic next due date projection, single schedule manual processing (`/{id}/process`), and batch due processing (`/process-due`).
+6. **🏆 Milestone-Driven Savings Goals (`/api/savings-goals`)**:
+   - Set savings targets with deadlines, category tags, and custom visual accents.
+   - Direct fund contributions (`/{id}/contribute`) from any user account, deducting the account balance and crediting the goal atomically.
+7. **📈 Financial Analytics & Executive Dashboard (`/api/dashboard`)**:
+   - Aggregated Net Worth, Period Income, Period Expense, and Net Cash Flow.
+   - Category expense distribution with percentage breakdowns.
+   - Multi-month income vs. expense historical trend trajectories.
+8. **🧠 AI-Driven Spending Insights (`/api/insights`)**:
+   - Financial Health Score evaluation (0–100 scale, A+ through F grades).
+   - Anomaly detection, top expense category warnings, recurring expense ratios, and personalized savings tips.
+9. **📑 Comprehensive Reporting & Backup (`/api/reports`)**:
+   - Monthly and yearly financial cash flow summaries.
+   - Full data backup export (`/export/json`) bundling accounts, transactions, budgets, recurring rules, and savings goals into a single portable JSON document.
+   - CSV financial ledger generation.
+10. **🔔 Live Dynamic Notifications (`/api/notifications`)**:
+    - Centralized alert notifications for budget threshold warnings, upcoming recurring payments, and account alerts.
+
+---
+
+## 📂 Architecture & Directory Structure
 
 ```
-src/main/java/com/example/finance/
-├── FinanceApplication.java                 # Main application entry point
-├── config/
-│   └── SwaggerConfig.java                  # Auto-opens Swagger UI on startup
-├── controller/
-│   ├── UserController.java                 # REST Controller for Users (/api/users)
-│   ├── AccountController.java              # REST Controller for Accounts (/api/accounts)
-│   └── TransactionController.java          # REST Controller for Transactions (/api/transactions)
-├── service/
-│   ├── UserService.java                    # User domain logic, duplicate email checks & CRUD
-│   ├── AccountService.java                 # Account domain logic & user ownership association
-│   └── TransactionService.java             # Transactional balance processing & ledger adjustments
-├── repository/
-│   ├── UserRepository.java                 # JPA Repository for User entity (existsByEmail)
-│   ├── AccountRepository.java              # JPA Repository for Account entity (findByUserId)
-│   └── TransactionRepository.java          # JPA Repository for Transaction entity (queries by account/type/category)
-├── entity/
-│   ├── User.java                           # JPA Entity for "users" table (1:N with Account)
-│   ├── Account.java                        # JPA Entity for "accounts" table (N:1 User, 1:N Transaction)
-│   ├── Transaction.java                    # JPA Entity for "transactions" table (N:1 Account)
-│   └── TransactionType.java                # Enum: INCOME, EXPENSE, TRANSFER
-├── dto/
-│   ├── request/
-│   │   ├── UserRequest.java                # Payload for user creation
-│   │   ├── UserUpdateRequest.java          # Payload for user update
-│   │   ├── AccountRequest.java             # Payload for account creation
-│   │   ├── AccountUpdateRequest.java       # Payload for account update
-│   │   ├── TransactionRequest.java         # Payload for transaction creation
-│   │   └── TransactionUpdateRequest.java   # Payload for transaction update
-│   └── response/
-│       ├── UserResponse.java               # User response payload
-│       ├── AccountResponse.java            # Account response payload
-│       ├── TransactionResponse.java        # Transaction response payload
-│       ├── ValidationErrorResponse.java    # Field-level validation error response (400)
-│       └── ErrorResponse.java              # Standard error response (400, 404, 409)
-└── exception/
-    ├── UserNotFoundException.java          # Missing user runtime exception (404)
-    ├── UserAlreadyExistsException.java     # Duplicate email runtime exception (409)
-    ├── AccountNotFoundException.java       # Missing account runtime exception (404)
-    ├── TransactionNotFoundException.java   # Missing transaction runtime exception (404)
-    ├── InsufficientBalanceException.java   # Insufficient balance for expense runtime exception (400)
-    └── GlobalExceptionHandler.java         # Centralized HTTP exception handler (@RestControllerAdvice)
+finance/
+├── Dockerfile                              # Multi-stage production container build
+├── render.yaml                             # Infrastructure-as-code cloud deployment
+├── pom.xml                                 # Maven dependencies & build plugins
+├── mvnw / mvnw.cmd                         # Maven wrapper executables
+└── src/
+    ├── main/
+    │   ├── java/com/example/finance/
+    │   │   ├── FinanceApplication.java     # Main application bootstrap
+    │   │   ├── config/
+    │   │   │   ├── OpenApiConfig.java      # OpenAPI 3 specification & Bearer Auth
+    │   │   │   ├── SwaggerConfig.java      # Browser auto-launch for Swagger UI
+    │   │   │   └── security/
+    │   │   │       ├── CustomUserDetailsService.java
+    │   │   │       ├── JwtAuthenticationEntryPoint.java
+    │   │   │       ├── JwtAuthenticationFilter.java
+    │   │   │       ├── JwtTokenProvider.java
+    │   │   │       ├── SecurityConfig.java
+    │   │   │       └── UserPrincipal.java
+    │   │   ├── controller/
+    │   │   │   ├── AccountController.java
+    │   │   │   ├── AuthController.java
+    │   │   │   ├── BudgetController.java
+    │   │   │   ├── DashboardController.java
+    │   │   │   ├── InsightController.java
+    │   │   │   ├── NotificationController.java
+    │   │   │   ├── RecurringTransactionController.java
+    │   │   │   ├── ReportController.java
+    │   │   │   ├── SavingsGoalController.java
+    │   │   │   ├── TransactionController.java
+    │   │   │   └── UserController.java
+    │   │   ├── service/
+    │   │   │   ├── AccountService.java
+    │   │   │   ├── AuthService.java
+    │   │   │   ├── BudgetService.java
+    │   │   │   ├── DashboardService.java
+    │   │   │   ├── InsightService.java
+    │   │   │   ├── NotificationService.java
+    │   │   │   ├── RecurringTransactionService.java
+    │   │   │   ├── ReportService.java
+    │   │   │   ├── SavingsGoalService.java
+    │   │   │   ├── TransactionService.java
+    │   │   │   └── UserService.java
+    │   │   ├── repository/
+    │   │   │   ├── AccountRepository.java
+    │   │   │   ├── BudgetRepository.java
+    │   │   │   ├── RecurringTransactionRepository.java
+    │   │   │   ├── SavingsGoalRepository.java
+    │   │   │   ├── TransactionRepository.java
+    │   │   │   ├── UserRepository.java
+    │   │   │   ├── projection/             # High-performance DB projection interfaces
+    │   │   │   └── specification/          # JPA Specifications for multi-criteria filters
+    │   │   ├── entity/
+    │   │   │   ├── Account.java
+    │   │   │   ├── Budget.java
+    │   │   │   ├── RecurrenceFrequency.java
+    │   │   │   ├── RecurringTransaction.java
+    │   │   │   ├── SavingsGoal.java
+    │   │   │   ├── Transaction.java
+    │   │   │   ├── TransactionType.java
+    │   │   │   └── User.java
+    │   │   ├── dto/
+    │   │   │   ├── request/                # Inbound request records with Jakarta validation
+    │   │   │   └── response/               # Outbound response records
+    │   │   └── exception/
+    │   │       └── GlobalExceptionHandler.java # Centralized @RestControllerAdvice
+    │   └── resources/
+    │       └── application.properties      # PostgreSQL, HikariCP, and JWT configuration
+    └── test/                               # Unit & Slice Integration Tests (H2 in-memory)
 ```
 
 ---
 
-## 🗄️ Relational Domain Model
+## 🗄️ Relational Domain Model (ERD)
 
 ```mermaid
 erDiagram
     USER ||--o{ ACCOUNT : "owns (1:N)"
-    ACCOUNT ||--o{ TRANSACTION : "records (1:N)"
+    USER ||--o{ TRANSACTION : "records (1:N)"
+    USER ||--o{ BUDGET : "plans (1:N)"
+    USER ||--o{ RECURRING_TRANSACTION : "schedules (1:N)"
+    USER ||--o{ SAVINGS_GOAL : "targets (1:N)"
+    ACCOUNT ||--o{ TRANSACTION : "holds (1:N)"
+    ACCOUNT ||--o{ RECURRING_TRANSACTION : "debits/credits (1:N)"
 
     USER {
         bigint id PK
         varchar name
         varchar email UK
+        varchar password
+        varchar role
         datetime created_at
     }
 
@@ -85,6 +166,8 @@ erDiagram
         varchar name
         varchar type
         decimal balance
+        decimal opening_balance
+        varchar currency
         bigint user_id FK
     }
 
@@ -94,365 +177,292 @@ erDiagram
         varchar type
         varchar category
         varchar description
+        varchar payment_method
         date transaction_date
         datetime created_at
         bigint account_id FK
+        bigint user_id FK
+    }
+
+    BUDGET {
+        bigint id PK
+        varchar category
+        decimal limit_amount
+        int month
+        int year
+        datetime created_at
+        datetime updated_at
+        bigint user_id FK
+    }
+
+    RECURRING_TRANSACTION {
+        bigint id PK
+        varchar title
+        decimal amount
+        varchar type
+        varchar category
+        varchar frequency
+        date start_date
+        date next_due_date
+        date end_date
+        varchar payment_method
+        boolean active
+        boolean auto_process
+        date last_processed_date
+        datetime created_at
+        datetime updated_at
+        bigint account_id FK
+        bigint user_id FK
+    }
+
+    SAVINGS_GOAL {
+        bigint id PK
+        varchar name
+        decimal target_amount
+        decimal current_amount
+        date target_date
+        varchar category
+        varchar color
+        varchar icon
+        boolean completed
+        varchar notes
+        datetime created_at
+        datetime updated_at
+        bigint user_id FK
     }
 ```
 
-* **User**: Can own multiple Accounts. Email is unique across all users.
-* **Account**: Belongs to a single User. Contains a monetary balance (`precision = 15, scale = 2`).
-* **Transaction**: Belongs to an Account. Types: `INCOME`, `EXPENSE`, `TRANSFER`.
-
 ---
 
-## ⚙️ Configuration & Database Setup
+## ⚙️ Configuration & Environment Variables
 
-The application connects to MySQL via `src/main/resources/application.properties`:
+The application is configured via `src/main/resources/application.properties` with fallback defaults and environment variable overrides:
 
-```properties
-spring.application.name=finance
-spring.datasource.url=jdbc:mysql://localhost:3306/FinanceDB
-spring.datasource.username=root
-spring.datasource.password=root
-spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+| Property | Environment Variable | Default Value | Description |
+|---|---|---|---|
+| `server.port` | `PORT` | `8080` | Port for the HTTP web server |
+| `spring.datasource.url` | `SPRING_DATASOURCE_URL` | Neon PostgreSQL JDBC URL | PostgreSQL connection JDBC string |
+| `spring.datasource.username` | `SPRING_DATASOURCE_USERNAME` | `neondb_owner` | Database username |
+| `spring.datasource.password` | `SPRING_DATASOURCE_PASSWORD` | *configured* | Database password |
+| `app.jwt.secret` | `JWT_SECRET` | *256-bit Hex String* | Secret key for signing HMAC-SHA256 JWTs |
+| `app.jwt.expiration-ms` | `JWT_EXPIRATION_MS` | `86400000` | JWT validity duration in milliseconds (24h) |
 
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-spring.jpa.properties.hibernate.format_sql=true
-```
-
-Ensure MySQL is running on `localhost:3306` with the `FinanceDB` database created:
-
+### Local Database Setup (Optional Local PostgreSQL)
+If you prefer running a local PostgreSQL instance instead of Neon:
 ```sql
-CREATE DATABASE IF NOT EXISTS FinanceDB;
+CREATE DATABASE financedb;
+```
+Then set:
+```properties
+spring.datasource.url=jdbc:postgresql://localhost:5432/financedb
+spring.datasource.username=postgres
+spring.datasource.password=yourpassword
 ```
 
 ---
 
-## 🚀 Key Business Logic & Execution Flows
+## 🚀 Getting Started
 
-### 1. Application Startup Flow
+### Prerequisites
+* **Java 21 JDK** or newer installed (`java -version`)
+* **Maven 3.9+** (or use the included `./mvnw` wrapper)
+* **PostgreSQL** database (or default connection to Neon cloud)
 
-1. **Main Entry**: Starts at `FinanceApplication.main()`.
-2. **Context & Persistence**: Initializes Spring Boot context; Hibernate automatically verifies/updates `users`, `accounts`, and `transactions` tables with foreign keys and unique constraints.
-3. **Swagger UI Auto-Launch**: Once started, `SwaggerConfig.java` opens `http://localhost:8080/swagger-ui/index.html` in the system default browser.
+### Run Locally with Maven
+1. **Clone & Navigate**:
+   ```bash
+   cd finance
+   ```
+2. **Build & Run**:
+   - **Linux / macOS**:
+     ```bash
+     ./mvnw spring-boot:run
+     ```
+   - **Windows PowerShell / CMD**:
+     ```powershell
+     .\mvnw.cmd spring-boot:run
+     ```
+3. Once booted, the service is available at `http://localhost:8080`.
+4. Swagger UI will automatically open in your default browser at:
+   ```
+   http://localhost:8080/swagger-ui/index.html
+   ```
+
+### Run with Docker
+1. **Build Container**:
+   ```bash
+   docker build -t apex-finance-api .
+   ```
+2. **Run Container**:
+   ```bash
+   docker run -p 8080:8080 \
+     -e SPRING_DATASOURCE_URL="jdbc:postgresql://your-host:5432/neondb?sslmode=require" \
+     -e SPRING_DATASOURCE_USERNAME="your-user" \
+     -e SPRING_DATASOURCE_PASSWORD="your-password" \
+     -e JWT_SECRET="your-256-bit-hex-key" \
+     apex-finance-api
+   ```
 
 ---
 
-### 2. User Management Flows (`/api/users`)
+## 📡 API Endpoints Specification
 
-* **Create User (`POST /api/users`)**:
-  1. Validates `UserRequest` (`@NotBlank name`, `@NotBlank @Email email`).
-  2. Checks `userRepository.existsByEmail()`. Throws `UserAlreadyExistsException` (409) if duplicate.
-  3. Saves user with `LocalDateTime.now()` and returns `UserResponse`.
-* **Update User (`PUT /api/users/{id}`)**:
-  1. Finds existing user or throws `UserNotFoundException` (404).
-  2. If the email is being changed, ensures no other user owns that email (`existsByEmail()`), otherwise throws `UserAlreadyExistsException` (409).
-  3. Updates name and email, saves, and returns `UserResponse`.
-* **Delete User (`DELETE /api/users/{id}`)**:
-  1. Checks if user exists; throws `UserNotFoundException` (404) if not found.
-  2. Deletes user record and returns `204 No Content`.
+All endpoints under `/api/**` (except `/api/auth/**`, `/swagger-ui/**`, and `/v3/api-docs/**`) require an `Authorization: Bearer <token>` header obtained from `/api/auth/login`.
+
+### 1. Authentication Endpoints (`/api/auth`)
+| Method | Endpoint | Description | Request Body | Auth Required |
+|---|---|---|---|---|
+| `POST` | `/api/auth/register` | Register new user account | `RegisterRequest` | No |
+| `POST` | `/api/auth/login` | Authenticate and obtain JWT token | `LoginRequest` | No |
+| `GET` | `/api/auth/me` | Fetch authenticated user profile | *None* | **Yes** |
+
+### 2. Account Endpoints (`/api/accounts`)
+| Method | Endpoint | Description | Request Body | Auth Required |
+|---|---|---|---|---|
+| `POST` | `/api/accounts` | Create financial account | `AccountRequest` | **Yes** |
+| `GET` | `/api/accounts` | List all accounts of authenticated user | *None* | **Yes** |
+| `GET` | `/api/accounts/{id}` | Get account details by ID | *None* | **Yes** |
+| `PUT` | `/api/accounts/{id}` | Update account metadata / balance | `AccountUpdateRequest` | **Yes** |
+| `DELETE` | `/api/accounts/{id}` | Delete account | *None* | **Yes** |
+| `POST` | `/api/accounts/transfer` | Atomic transfer between accounts | `TransferRequest` | **Yes** |
+
+### 3. Transaction Endpoints (`/api/transactions`)
+| Method | Endpoint | Description | Parameters / Body | Auth Required |
+|---|---|---|---|---|
+| `POST` | `/api/transactions` | Create transaction & adjust balance | `TransactionRequest` | **Yes** |
+| `GET` | `/api/transactions` | Search & paginate transactions | `search, type, category, accountId, minAmount, maxAmount, startDate, endDate, page, size, sortBy, sortDir` | **Yes** |
+| `GET` | `/api/transactions/{id}` | Get transaction by ID | *None* | **Yes** |
+| `PUT` | `/api/transactions/{id}` | Update transaction & recalculate balance | `TransactionUpdateRequest` | **Yes** |
+| `DELETE` | `/api/transactions/{id}` | Delete transaction & revert balance | *None* | **Yes** |
+| `POST` | `/api/transactions/import-csv` | Bulk import transactions from CSV | `file` (multipart/form-data) | **Yes** |
+| `GET` | `/api/transactions/export/csv` | Download filtered transactions as CSV | Same filter parameters as `GET /api/transactions` | **Yes** |
+
+### 4. Budget Endpoints (`/api/budgets`)
+| Method | Endpoint | Description | Parameters / Body | Auth Required |
+|---|---|---|---|---|
+| `POST` | `/api/budgets` | Set or update monthly category budget | `BudgetRequest` | **Yes** |
+| `GET` | `/api/budgets` | List budgets (optional month/year filters) | `month, year` | **Yes** |
+| `GET` | `/api/budgets/{id}` | Get budget by ID | *None* | **Yes** |
+| `DELETE` | `/api/budgets/{id}` | Delete budget limit | *None* | **Yes** |
+| `GET` | `/api/budgets/status` | Live spending status & threshold alerts | `month, year` | **Yes** |
+
+### 5. Recurring Transaction Endpoints (`/api/recurring-transactions`)
+| Method | Endpoint | Description | Request Body | Auth Required |
+|---|---|---|---|---|
+| `GET` | `/api/recurring-transactions` | List all recurring schedules | *None* | **Yes** |
+| `POST` | `/api/recurring-transactions` | Create recurring rule | `RecurringTransactionRequest` | **Yes** |
+| `GET` | `/api/recurring-transactions/{id}` | Get recurring schedule by ID | *None* | **Yes** |
+| `PUT` | `/api/recurring-transactions/{id}` | Update recurring schedule | `RecurringTransactionRequest` | **Yes** |
+| `DELETE` | `/api/recurring-transactions/{id}` | Delete recurring schedule | *None* | **Yes** |
+| `POST` | `/api/recurring-transactions/{id}/process` | Post individual recurring item to ledger | *None* | **Yes** |
+| `POST` | `/api/recurring-transactions/process-due` | Process all schedules due up to today | *None* | **Yes** |
+
+### 6. Savings Goals Endpoints (`/api/savings-goals`)
+| Method | Endpoint | Description | Request Body | Auth Required |
+|---|---|---|---|---|
+| `GET` | `/api/savings-goals` | List all savings targets | *None* | **Yes** |
+| `POST` | `/api/savings-goals` | Create savings target | `SavingsGoalRequest` | **Yes** |
+| `GET` | `/api/savings-goals/{id}` | Get savings target by ID | *None* | **Yes** |
+| `PUT` | `/api/savings-goals/{id}` | Update savings target | `SavingsGoalRequest` | **Yes** |
+| `DELETE` | `/api/savings-goals/{id}` | Delete savings target | *None* | **Yes** |
+| `POST` | `/api/savings-goals/{id}/contribute` | Deposit funds from account into goal | `GoalContributionRequest` | **Yes** |
+
+### 7. Dashboard & Analytics Endpoints (`/api/dashboard`)
+| Method | Endpoint | Description | Parameters | Auth Required |
+|---|---|---|---|---|
+| `GET` | `/api/dashboard/summary` | Aggregated net worth, cash flow & counts | `month, year` | **Yes** |
+| `GET` | `/api/dashboard/category-breakdown` | Category distribution & percentages | `month, year` | **Yes** |
+| `GET` | `/api/dashboard/monthly-trend` | Multi-month income vs. expense trend | `months` (default 6) | **Yes** |
+
+### 8. AI Insights Endpoints (`/api/insights`)
+| Method | Endpoint | Description | Parameters | Auth Required |
+|---|---|---|---|---|
+| `GET` | `/api/insights/spending` | Health score, anomalies & savings tips | *None* | **Yes** |
+
+### 9. Reports & Backup Endpoints (`/api/reports`)
+| Method | Endpoint | Description | Parameters | Auth Required |
+|---|---|---|---|---|
+| `GET` | `/api/reports/monthly` | Monthly cash flow statement | `year, month` | **Yes** |
+| `GET` | `/api/reports/yearly` | Yearly financial report & 12-month curve | `year` | **Yes** |
+| `GET` | `/api/reports/monthly/category` | Category-level expense totals | `year, month` | **Yes** |
+| `GET` | `/api/reports/export/csv` | Download complete ledger as CSV | *None* | **Yes** |
+| `GET` | `/api/reports/export/json` | Full JSON data backup | *None* | **Yes** |
+
+### 10. Notification Endpoints (`/api/notifications`)
+| Method | Endpoint | Description | Parameters | Auth Required |
+|---|---|---|---|---|
+| `GET` | `/api/notifications` | Dynamic budget alerts & bill reminders | *None* | **Yes** |
 
 ---
 
-### 3. Account Management Flows (`/api/accounts`)
+## 📋 Sample Payloads
 
-* **Create Account (`POST /api/accounts`)**:
-  1. Validates `AccountRequest` (name, type, balance >= 0, userId).
-  2. Verifies user exists via `userRepository.findById(request.userId())`. If absent, throws `UserNotFoundException` (404).
-  3. Instantiates `Account` linked to the `User`, saves, and returns `AccountResponse`.
-* **Get Accounts by User (`GET /api/accounts/user/{userId}`)**:
-  1. Verifies user exists; throws `UserNotFoundException` (404) if missing.
-  2. Fetches all accounts owned by `userId` using `accountRepository.findByUserId(userId)`.
-* **Update Account (`PUT /api/accounts/{id}`)**:
-  1. Locates account by ID or throws `AccountNotFoundException` (404).
-  2. Updates name, type, and balance; saves and returns `AccountResponse`.
-* **Delete Account (`DELETE /api/accounts/{id}`)**:
-  1. Locates account by ID or throws `AccountNotFoundException` (404).
-  2. Deletes account and returns `204 No Content`.
+### Inter-Account Transfer (`POST /api/accounts/transfer`)
+```json
+{
+  "sourceAccountId": 1,
+  "destinationAccountId": 2,
+  "amount": 500.00,
+  "destinationAmount": 500.00,
+  "description": "Monthly transfer to high-yield savings",
+  "transferDate": "2026-10-19"
+}
+```
+
+### Recurring Transaction Schedule (`POST /api/recurring-transactions`)
+```json
+{
+  "accountId": 1,
+  "title": "Cloud Server Subscription",
+  "amount": 49.99,
+  "type": "EXPENSE",
+  "category": "Utilities",
+  "frequency": "MONTHLY",
+  "startDate": "2026-10-01",
+  "nextDueDate": "2026-11-01",
+  "paymentMethod": "CREDIT_CARD",
+  "description": "Production hosting infra",
+  "active": true,
+  "autoProcess": true
+}
+```
+
+### Goal Contribution (`POST /api/savings-goals/{id}/contribute`)
+```json
+{
+  "accountId": 1,
+  "amount": 250.00,
+  "notes": "Emergency fund allocation"
+}
+```
 
 ---
 
-### 4. Transaction Creation & Balance Calculation Flow (`POST /api/transactions`)
-
-Every transaction adjusts the corresponding account balance within a `@Transactional` boundary:
+## 🔒 Security Architecture
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    actor Client
-    participant Controller as TransactionController
-    participant Service as TransactionService
-    participant AccRepo as AccountRepository
-    participant TxRepo as TransactionRepository
-    participant Handler as GlobalExceptionHandler
-    participant DB as MySQL Database
-
-    Client->>Controller: POST /api/transactions (TransactionRequest)
-    Controller->>Service: createTransaction(request)
-    Service->>AccRepo: findById(request.accountId())
-    alt Account Not Found
-        AccRepo-->>Service: Optional.empty()
-        Service-->>Handler: Throws AccountNotFoundException (404)
-        Handler-->>Client: 404 NOT_FOUND + ErrorResponse
-    else Account Found
-        AccRepo-->>Service: Account entity
-        alt Transaction Type is EXPENSE and balance < amount
-            Service-->>Handler: Throws InsufficientBalanceException (400)
-            Handler-->>Client: 400 BAD_REQUEST ("Insufficient account balance")
-        else Valid Balance / INCOME / TRANSFER
-            Note over Service: If INCOME: balance = balance + amount<br/>If EXPENSE/TRANSFER: balance = balance - amount
-            Service->>TxRepo: save(transaction)
-            TxRepo->>DB: INSERT INTO transactions
-            Service->>AccRepo: save(account)
-            AccRepo->>DB: UPDATE accounts SET balance = ...
-            Service-->>Controller: TransactionResponse
-            Controller-->>Client: 200 OK + TransactionResponse JSON
-        end
-    end
+flowchart TD
+    Client[HTTP Client / Frontend] -->|Bearer JWT Header| Filter[JwtAuthenticationFilter]
+    Filter -->|Extract & Validate Token| TokenProvider[JwtTokenProvider]
+    TokenProvider -->|Valid Claims| UserDetails[CustomUserDetailsService]
+    UserDetails -->|Load UserPrincipal| SecurityContext[SecurityContextHolder]
+    SecurityContext --> Controller[Authenticated RestController]
+    Filter -->|Invalid or Expired| EntryPoint[JwtAuthenticationEntryPoint (401 Unauthorized)]
 ```
 
----
-
-### 5. Transaction Update Flow (`PUT /api/transactions/{id}`)
-
-Transaction updates safely adjust account balances in 5 atomic steps:
-
-1. **Fetch**: Find existing transaction or throw `TransactionNotFoundException` (404).
-2. **Reverse Old Effect**:
-   - If old type was `INCOME`: `balance = balance - oldAmount`
-   - If old type was `EXPENSE`/`TRANSFER`: `balance = balance + oldAmount`
-3. **Validate New Transaction**:
-   - If new type is `EXPENSE` and reversed `balance < newAmount`: throw `InsufficientBalanceException` (400).
-4. **Apply New Effect**:
-   - If new type is `INCOME`: `balance = balance + newAmount`
-   - If new type is `EXPENSE`/`TRANSFER`: `balance = balance - newAmount`
-5. **Persist**: Update transaction properties (`amount`, `type`, `category`, `description`, `transactionDate`), save transaction, save updated account balance, and return `TransactionResponse`.
-
----
-
-### 6. Transaction Deletion Flow (`DELETE /api/transactions/{id}`)
-
-1. Locates transaction by ID or throws `TransactionNotFoundException` (404).
-2. **Reverses** the effect on the associated account balance:
-   - If `INCOME`: `balance = balance - amount`
-   - If `EXPENSE`/`TRANSFER`: `balance = balance + amount`
-3. Deletes the transaction from `transactionRepository`.
-4. Saves updated account balance to `accountRepository`.
-5. Returns `204 No Content`.
-
----
-
-## 📡 API Endpoints Summary
-
-### User Endpoints (`/api/users`)
-
-| Method | Endpoint | Description | Request Body | Success Code | Error Codes |
-|---|---|---|---|---|---|
-| `POST` | `/api/users` | Create user | `UserRequest` | `200 OK` | `400 BAD_REQUEST`, `409 CONFLICT` |
-| `GET` | `/api/users` | Get all users | *None* | `200 OK` | — |
-| `GET` | `/api/users/{id}` | Get user by ID | *None* | `200 OK` | `404 NOT_FOUND` |
-| `PUT` | `/api/users/{id}` | Update user | `UserUpdateRequest` | `200 OK` | `400 BAD_REQUEST`, `404 NOT_FOUND`, `409 CONFLICT` |
-| `DELETE` | `/api/users/{id}` | Delete user | *None* | `204 NO_CONTENT` | `404 NOT_FOUND` |
-
-### Account Endpoints (`/api/accounts`)
-
-| Method | Endpoint | Description | Request Body | Success Code | Error Codes |
-|---|---|---|---|---|---|
-| `POST` | `/api/accounts` | Create account | `AccountRequest` | `200 OK` | `400 BAD_REQUEST`, `404 NOT_FOUND` (User missing) |
-| `GET` | `/api/accounts` | Get all accounts | *None* | `200 OK` | — |
-| `GET` | `/api/accounts/{id}` | Get account by ID | *None* | `200 OK` | `404 NOT_FOUND` |
-| `GET` | `/api/accounts/user/{userId}` | Get accounts by User ID | *None* | `200 OK` | `404 NOT_FOUND` (User missing) |
-| `PUT` | `/api/accounts/{id}` | Update account | `AccountUpdateRequest` | `200 OK` | `400 BAD_REQUEST`, `404 NOT_FOUND` |
-| `DELETE` | `/api/accounts/{id}` | Delete account | *None* | `204 NO_CONTENT` | `404 NOT_FOUND` |
-
-### Transaction Endpoints (`/api/transactions`)
-
-| Method | Endpoint | Description | Request / Query Params | Success Code | Error Codes |
-|---|---|---|---|---|---|
-| `POST` | `/api/transactions` | Create transaction & adjust balance | `TransactionRequest` | `200 OK` | `400 BAD_REQUEST` (Validation / Insufficient Balance), `404 NOT_FOUND` (Account missing) |
-| `GET` | `/api/transactions` | Get paginated & sorted transactions | `page` (int, default 0)<br>`size` (int, default 10)<br>`sort` (e.g. `amount,asc`)<br>`sortBy` (optional field name)<br>`sortDir` (`asc` / `desc`) | `200 OK` | `400 BAD_REQUEST` (Invalid sort field) |
-| `GET` | `/api/transactions/{id}` | Get transaction by ID | *None* | `200 OK` | `404 NOT_FOUND` |
-| `GET` | `/api/transactions/account/{accountId}` | Get transactions by Account ID | *None* | `200 OK` | — |
-| `GET` | `/api/transactions/type/{type}` | Get transactions by Type (`INCOME`, `EXPENSE`, `TRANSFER`) | *None* | `200 OK` | `400 BAD_REQUEST` |
-| `GET` | `/api/transactions/category/{category}` | Get transactions by Category | *None* | `200 OK` | — |
-| `PUT` | `/api/transactions/{id}` | Update transaction & adjust balance | `TransactionUpdateRequest` | `200 OK` | `400 BAD_REQUEST` (Validation / Insufficient Balance), `404 NOT_FOUND` |
-| `DELETE` | `/api/transactions/{id}` | Delete transaction & revert balance | *None* | `204 NO_CONTENT` | `404 NOT_FOUND` |
-
----
-
-## 📋 Request & Response Models
-
-### 1. User Models
-
-#### `UserRequest` (Create)
-```json
-{
-  "name": "John Doe",
-  "email": "john.doe@example.com"
-}
-```
-* `name`: `@NotBlank(message = "Name is required")`
-* `email`: `@NotBlank(message = "Email is required")`, `@Email(message = "Invalid email format")`
-
-#### `UserUpdateRequest` (Update)
-```json
-{
-  "name": "John Doe Updated",
-  "email": "john.updated@example.com"
-}
-```
-
-#### `UserResponse`
-```json
-{
-  "id": 1,
-  "name": "John Doe",
-  "email": "john.doe@example.com",
-  "createdAt": "2026-09-25T10:15:30"
-}
-```
-
----
-
-### 2. Account Models
-
-#### `AccountRequest` (Create)
-```json
-{
-  "name": "Checking Account",
-  "type": "CHECKING",
-  "balance": 1500.00,
-  "userId": 1
-}
-```
-* `name`: `@NotBlank(message = "Account name is required")`
-* `type`: `@NotBlank(message = "Account type is required")`
-* `balance`: `@NotNull(message = "Balance is required")`, `@DecimalMin(value = "0.0", message = "Balance cannot be negative")`
-* `userId`: `@NotNull(message = "User ID is required")`
-
-#### `AccountUpdateRequest` (Update)
-```json
-{
-  "name": "Primary Savings",
-  "type": "SAVINGS",
-  "balance": 2000.00
-}
-```
-
-#### `AccountResponse`
-```json
-{
-  "id": 1,
-  "name": "Checking Account",
-  "type": "CHECKING",
-  "balance": 1500.00,
-  "userId": 1
-}
-```
-
----
-
-### 3. Transaction Models
-
-#### `TransactionRequest` (Create)
-```json
-{
-  "amount": 250.75,
-  "type": "EXPENSE",
-  "category": "Groceries",
-  "description": "Weekly supermarket shopping",
-  "transactionDate": "2026-09-25",
-  "accountId": 1
-}
-```
-* `amount`: `@NotNull(message = "Amount is required")`, `@DecimalMin(value = "0.01", message = "Amount must be greater than 0")`
-* `type`: `@NotNull(message = "Transaction type is required")` (Values: `INCOME`, `EXPENSE`, `TRANSFER`)
-* `category`: `@NotBlank(message = "Category is required")`
-* `description`: Optional text
-* `transactionDate`: `@NotNull(message = "Transaction date is required")` (`YYYY-MM-DD`)
-* `accountId`: `@NotNull(message = "Account ID is required")`
-
-#### `TransactionUpdateRequest` (Update)
-```json
-{
-  "amount": 300.00,
-  "type": "EXPENSE",
-  "category": "Groceries",
-  "description": "Weekly supermarket shopping with extras",
-  "transactionDate": "2026-09-25"
-}
-```
-
-#### `TransactionResponse`
-```json
-{
-  "id": 1,
-  "amount": 250.75,
-  "type": "EXPENSE",
-  "category": "Groceries",
-  "description": "Weekly supermarket shopping",
-  "transactionDate": "2026-09-25",
-  "createdAt": "2026-09-25T11:00:00",
-  "accountId": 1
-}
-```
-
----
-
-### 4. Centralized Error Responses
-
-#### Validation Error (HTTP 400 - `ValidationErrorResponse`)
-Returned when request body validation fails (`MethodArgumentNotValidException`):
-```json
-{
-  "status": 400,
-  "errors": {
-    "amount": "Amount must be greater than 0",
-    "category": "Category is required"
-  },
-  "timestamp": "2026-09-25T11:00:00"
-}
-```
-
-#### Insufficient Balance Error (HTTP 400 - `ErrorResponse`)
-Returned when an `EXPENSE` transaction exceeds the account balance:
-```json
-{
-  "status": 400,
-  "message": "Insufficient account balance",
-  "timestamp": "2026-09-25T11:00:00"
-}
-```
-
-#### Resource Not Found Error (HTTP 404 - `ErrorResponse`)
-Returned when a User, Account, or Transaction is not found:
-```json
-{
-  "status": 404,
-  "message": "Account Not Found",
-  "timestamp": "2026-09-25T11:00:00"
-}
-```
-
-#### Conflict Error (HTTP 409 - `ErrorResponse`)
-Returned when attempting to register or update to an existing email:
-```json
-{
-  "status": 409,
-  "message": "User with this email already exists",
-  "timestamp": "2026-09-25T11:00:00"
-}
-```
+* **Passwords**: Encrypted with BCrypt hashing algorithm (`10` rounds salt).
+* **JWT Token**: Encoded with HMAC-SHA256 containing User ID, Email, and Roles.
+* **CORS**: Configured in `SecurityConfig.java` to support local development ports (`localhost:*`, `127.0.0.1:*`) as well as production Vercel (`*.vercel.app`) and Render domains (`*.onrender.com`).
 
 ---
 
 ## 📖 Swagger Documentation UI
 
-Once the application is running, Swagger UI is automatically opened in your default browser at:
+Once the application is running, inspect and interactively test every API endpoint via Swagger UI:
 ```
 http://localhost:8080/swagger-ui/index.html
 ```
-You can also inspect the raw OpenAPI JSON specification at `http://localhost:8080/v3/api-docs`.
-
+Raw OpenAPI v3 JSON schema is available at:
+```
+http://localhost:8080/v3/api-docs
+```
